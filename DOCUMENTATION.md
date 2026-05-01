@@ -142,3 +142,39 @@ ffprobe -v error -show_streams .tmp/test.mp4
 - Smoke render succeeded.
 - Smoke-output sanity test confirmed `.tmp/test.mp4` has a non-zero file size plus video and audio
   streams.
+
+## 2026-05-01 - M2 Audio Analysis And Timeline
+
+### Changed
+
+- Added `AudioAnalysis` and `TimeSeries` JSON models for normalized audio features.
+- Implemented `wavesmith analyze` for MP3/WAV files.
+- Added librosa-based extraction for duration, sample rate, tempo, beats, onsets, RMS, bass/mid/treble
+  energy, spectrum, and waveform preview.
+- Added stable JSON read/write helpers for analysis payloads.
+- Added `Timeline.at(time_seconds)` for scalar and vector feature interpolation.
+- Added tests for analysis output, JSON roundtrip, CLI analyze, and timeline lookup.
+
+### Validation Run
+
+```bash
+.venv/bin/ruff check .
+.venv/bin/python -m pytest
+.venv/bin/python scripts/generate_test_audio.py .tmp/test.wav --seconds 5
+.venv/bin/wavesmith analyze .tmp/test.wav --out .tmp/test.analysis.json
+```
+
+### Result
+
+- Passed.
+- Unit test suite: 27 tests passed.
+- `wavesmith analyze` wrote `.tmp/test.analysis.json`.
+- Analysis JSON included all required M2 feature keys.
+- Test analysis contained 216 RMS samples and 32 spectrum bins.
+
+### Known Issues
+
+- Analysis cache reuse is still future M5 work.
+- Render output does not consume analysis/timeline data yet; M3 will connect visuals to features.
+- Beat detection on very short synthetic fixtures may produce sparse or empty beat lists, which is
+  acceptable for M2.

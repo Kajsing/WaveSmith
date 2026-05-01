@@ -7,6 +7,7 @@ import typer
 from rich.console import Console
 
 from wavesmith import __version__
+from wavesmith.audio.analyzer import AudioAnalysisError, analyze_audio
 from wavesmith.presets.loader import PresetError, list_builtin_presets, load_preset
 from wavesmith.render.ffmpeg import FfmpegMissingError, FfmpegRenderError
 from wavesmith.render.options import RenderOptionsError, build_render_options
@@ -121,12 +122,19 @@ def analyze(
     out: Annotated[Path | None, typer.Option("--out", help="Optional analysis JSON path.")] = None,
     force: Annotated[bool, typer.Option("--force", help="Force analysis refresh.")] = False,
 ) -> None:
-    """Placeholder for audio analysis."""
-    console.print("[yellow]Audio analysis is planned for M2 and is not implemented in M0.[/yellow]")
-    console.print(f"input={input_audio}")
-    console.print(f"out={out}")
-    console.print(f"force={force}")
-    raise typer.Exit(1)
+    """Analyze audio and write feature JSON."""
+    if force:
+        console.print("[yellow]Note:[/yellow] --force is reserved for cache refresh in M5.")
+
+    output_path = out or input_audio.with_suffix(".analysis.json")
+    try:
+        analysis = analyze_audio(input_audio)
+    except AudioAnalysisError as exc:
+        console.print(f"[red]Audio analysis failed:[/red] {exc}")
+        raise typer.Exit(2) from exc
+
+    analysis.write_json(output_path)
+    console.print(f"[green]Analysis written:[/green] {output_path}")
 
 
 @app.command()

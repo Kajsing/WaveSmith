@@ -1,5 +1,6 @@
 from typer.testing import CliRunner
 
+from tests.audio_fixtures import write_test_tone
 from wavesmith.cli import app
 
 runner = CliRunner()
@@ -56,3 +57,22 @@ def test_render_rejects_invalid_resolution(tmp_path) -> None:
 
     assert result.exit_code == 2
     assert "even numbers" in result.output
+
+
+def test_analyze_writes_json(tmp_path) -> None:
+    audio = tmp_path / "tone.wav"
+    output = tmp_path / "tone.analysis.json"
+    write_test_tone(audio)
+
+    result = runner.invoke(app, ["analyze", str(audio), "--out", str(output)])
+
+    assert result.exit_code == 0
+    assert output.exists()
+    assert "Analysis written" in result.output
+
+
+def test_analyze_rejects_missing_input(tmp_path) -> None:
+    result = runner.invoke(app, ["analyze", str(tmp_path / "missing.wav")])
+
+    assert result.exit_code == 2
+    assert "does not exist" in result.output
