@@ -32,6 +32,38 @@ def test_validate_preset_accepts_builtin_file() -> None:
     assert "Valid preset" in result.output
 
 
+def test_art_brief_command_writes_json(tmp_path) -> None:
+    lyrics = tmp_path / "song.lrc"
+    output = tmp_path / "song.art.json"
+    lyrics.write_text("[00:01.00]dark pressure under skin", encoding="utf-8")
+
+    result = runner.invoke(app, ["art-brief", "--lyrics", str(lyrics), "--out", str(output)])
+
+    assert result.exit_code == 0
+    assert output.exists()
+    assert "Art brief written" in result.output
+
+
+def test_make_preset_command_writes_valid_yaml(tmp_path) -> None:
+    output = tmp_path / "custom.yaml"
+
+    result = runner.invoke(
+        app,
+        [
+            "make-preset",
+            "dark cyberpunk shader bloom",
+            "--name",
+            "dark cyber",
+            "--out",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert output.exists()
+    assert "Preset written" in result.output
+
+
 def test_render_rejects_missing_input() -> None:
     result = runner.invoke(app, ["render", "missing.wav", "out.mp4"])
 

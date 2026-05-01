@@ -46,6 +46,21 @@ WaveSmith can burn timed `.lrc` or `.srt` lyrics into a render:
 wavesmith render song.mp3 lyric-video.mp4 --preset shader_bloom --lyrics song.lrc --lyrics-offset 0.25
 ```
 
+Lyrics can also drive local art direction:
+
+```bash
+wavesmith art-brief --lyrics song.lrc --out song.art.json
+```
+
+## Prompt To Preset
+
+Generate editable preset YAML locally from a short style prompt:
+
+```bash
+wavesmith make-preset "dark cyberpunk shader bloom" --name dark_cyber --out presets/dark_cyber.yaml
+wavesmith validate-preset presets/dark_cyber.yaml
+```
+
 ## Thumbnail
 
 ```bash

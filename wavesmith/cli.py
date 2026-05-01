@@ -1,14 +1,18 @@
 """Command line interface for WaveSmith."""
 
+import json
 from pathlib import Path
 from typing import Annotated
 
 import typer
+import yaml
 from rich.console import Console
 
 from wavesmith import __version__
+from wavesmith.art import build_art_brief
 from wavesmith.audio.analyzer import DEFAULT_FEATURE_FPS, AudioAnalysisError, analyze_audio
-from wavesmith.lyrics import LyricsError
+from wavesmith.lyrics import LyricsError, load_lyrics
+from wavesmith.presets.generator import generate_preset_dict
 from wavesmith.presets.loader import PresetError, list_builtin_presets, load_preset
 from wavesmith.render.batch import run_batch
 from wavesmith.render.ffmpeg import FfmpegMissingError, FfmpegRenderError
@@ -68,6 +72,52 @@ def validate_preset(
         raise typer.Exit(5) from exc
 
     console.print(f"[green]Valid preset:[/green] {preset.name}")
+
+
+@app.command("art-brief")
+def art_brief(
+    lyrics: Annotated[Path, typer.Option("--lyrics", help="Input .lrc or .srt timed lyrics file.")],
+    out: Annotated[Path | None, typer.Option("--out", help="Optional art brief JSON path.")] = None,
+) -> None:
+    """Build a local art direction brief from timed lyrics."""
+    try:
+        cues = load_lyrics(lyrics)
+    except LyricsError as exc:
+        console.print(f"[red]Lyrics error:[/red] {exc}")
+        raise typer.Exit(2) from exc
+
+    brief = build_art_brief(cues).to_dict()
+    if out:
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(json.dumps(brief, indent=2) + "\n", encoding="utf-8")
+        console.print(f"[green]Art brief written:[/green] {out}")
+    else:
+        console.print_json(json.dumps(brief))
+
+
+@app.command("make-preset")
+def make_preset(
+    prompt: Annotated[str, typer.Argument(help="Short visual style prompt.")],
+    out: Annotated[Path, typer.Option("--out", help="Output preset YAML path.")],
+    name: Annotated[
+        str,
+        typer.Option("--name", help="Preset name written into YAML."),
+    ] = "custom_prompt",
+    force: Annotated[
+        bool,
+        typer.Option("--force", help="Overwrite an existing preset file."),
+    ] = False,
+) -> None:
+    """Generate a local schema-validated preset YAML file from a prompt."""
+    if out.exists() and not force:
+        console.print("[red]Preset already exists:[/red] use --force to overwrite it.")
+        raise typer.Exit(2)
+
+    preset = generate_preset_dict(prompt, name=name)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(yaml.safe_dump(preset, sort_keys=False), encoding="utf-8")
+    load_preset(out)
+    console.print(f"[green]Preset written:[/green] {out}")
 
 
 @app.command()
