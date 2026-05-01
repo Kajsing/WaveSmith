@@ -70,3 +70,8 @@ python -m pytest
 ## Generated Files
 
 Rendered videos, user audio, logs, and large analysis caches should not be committed to Git.
+
+## Roadmap
+
+See `ROADMAP.md` for planned future work, including lyrics display, lyrics-driven art direction,
+poster thumbnails, optional AI assistance, and GPU/shader rendering.
