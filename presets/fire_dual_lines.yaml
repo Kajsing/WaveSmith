@@ -24,6 +24,7 @@ modules:
     element: fire
     behavior: dual_lines
     line_texture: plasma
+    line_direction: left_to_right
     density: 72
     bands: 2
     blur: 3

@@ -21,6 +21,10 @@ def draw_elemental_field(ctx: FrameContext, module: PresetModule | None = None) 
     line_texture = str(
         module_config.get("line_texture", module_config.get("prominence_texture", "plasma"))
     )
+    line_direction = str(module_config.get("line_direction", "left_to_right"))
+    line_direction_seed = str(
+        module_config.get("line_direction_seed", module.id if module else ctx.preset_name)
+    )
     intensity = feature_float(ctx.features, str(module_config.get("intensity_feature", "rms")))
     bass = feature_float(ctx.features, str(module_config.get("bass_feature", "bass_energy")))
     treble = feature_float(ctx.features, str(module_config.get("motion_feature", "treble_energy")))
@@ -44,6 +48,8 @@ def draw_elemental_field(ctx: FrameContext, module: PresetModule | None = None) 
             beat,
             behavior.lower(),
             line_texture.lower(),
+            line_direction.lower(),
+            line_direction_seed,
         )
     elif element == "water":
         _draw_water(ctx, draw, palette, bands, density, opacity, intensity, bass, treble, beat)
@@ -76,11 +82,23 @@ def _draw_fire(
     beat: float,
     behavior: str,
     line_texture: str,
+    line_direction: str,
+    line_direction_seed: str,
 ) -> None:
     floor = ctx.height * (0.93 - beat * 0.05)
     if behavior in {"dual_lines", "fire_lines", "line_pair", "rails"}:
         _draw_dual_fire_lines(
-            ctx, overlay, palette, opacity, intensity, bass, treble, beat, line_texture
+            ctx,
+            overlay,
+            palette,
+            opacity,
+            intensity,
+            bass,
+            treble,
+            beat,
+            line_texture,
+            line_direction,
+            line_direction_seed,
         )
         return
 
@@ -127,6 +145,8 @@ def _draw_dual_fire_lines(
     treble: float,
     beat: float,
     line_texture: str,
+    line_direction: str,
+    line_direction_seed: str,
 ) -> None:
     glow = Image.new("RGBA", (ctx.width, ctx.height), (0, 0, 0, 0))
     glow_draw = ImageDraw.Draw(glow)
@@ -135,7 +155,8 @@ def _draw_dual_fire_lines(
     for line_index in range(2):
         amount = line_index / 1
         channel = _dual_line_channel_features(ctx, line_index, intensity, bass, treble)
-        points = _dual_fire_line_points(ctx, line_index)
+        resolved_direction = _resolve_dual_line_direction(ctx, line_direction, line_direction_seed)
+        points = _dual_fire_line_points(ctx, line_index, resolved_direction)
         outer = blend_color((255, 58, 18), palette[1], 0.35 + amount * 0.12)
         middle = blend_color((255, 158, 34), palette[2], 0.22)
         inner = blend_color((255, 236, 148), palette[2], 0.62)
@@ -207,10 +228,38 @@ def _dual_line_channel_features(
     }
 
 
-def _dual_fire_line_points(ctx: FrameContext, line_index: int) -> list[tuple[float, float]]:
+def _resolve_dual_line_direction(
+    ctx: FrameContext,
+    line_direction: str,
+    line_direction_seed: str,
+) -> str:
+    if line_direction in {"right_to_left", "rtl", "left", "reverse"}:
+        return "right_to_left"
+    if line_direction in {"random", "auto"}:
+        seed = _text_seed(f"{ctx.preset_name}:{line_direction_seed}")
+        return "right_to_left" if _hash_scalar(seed, 31.0) > 0.5 else "left_to_right"
+    return "left_to_right"
+
+
+def _text_seed(value: str) -> float:
+    total = 0
+    for index, character in enumerate(value):
+        total += (index + 1) * ord(character)
+    return float(total or 1)
+
+
+def _dual_fire_line_points(
+    ctx: FrameContext,
+    line_index: int,
+    line_direction: str,
+) -> list[tuple[float, float]]:
     points: list[tuple[float, float]] = []
-    far = (-ctx.width * 0.1, ctx.height * (0.34 + line_index * 0.13))
-    near = (ctx.width * 1.08, ctx.height * (0.59 + line_index * 0.18))
+    if line_direction == "right_to_left":
+        far = (ctx.width * 1.1, ctx.height * (0.34 + line_index * 0.13))
+        near = (-ctx.width * 0.08, ctx.height * (0.59 + line_index * 0.18))
+    else:
+        far = (-ctx.width * 0.1, ctx.height * (0.34 + line_index * 0.13))
+        near = (ctx.width * 1.08, ctx.height * (0.59 + line_index * 0.18))
     sample_count = 260
     for index in range(sample_count):
         amount = index / (sample_count - 1)
