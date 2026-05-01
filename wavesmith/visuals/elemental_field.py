@@ -228,7 +228,7 @@ def _draw_solar_surface(
 
 
 def _solar_ellipse(width: int, height: int) -> tuple[float, float, float, float]:
-    return width * 0.5, height * 1.32, width * 0.68, height * 0.82
+    return width * 0.5, height * 1.52, width * 0.72, height * 0.78
 
 
 def _solar_limb_y(ctx: FrameContext, x: float) -> float:
@@ -252,21 +252,33 @@ def _draw_solar_prominences(
     glow_draw = ImageDraw.Draw(glow)
     sharp = Image.new("RGBA", (ctx.width, ctx.height), (0, 0, 0, 0))
     sharp_draw = ImageDraw.Draw(sharp)
-    anchors = (0.16, 0.47, 0.72, 0.88)
+    anchors = (0.12, 0.28, 0.44, 0.62, 0.78, 0.92)
     for index, anchor in enumerate(anchors):
         seed = float(index) + 1.0
+        activation = _music_region_envelope(ctx, index)
+        if activation < 0.02:
+            continue
         width = ctx.width * (0.13 + _hash_scalar(seed, 4.0) * 0.2)
-        height = ctx.height * (0.12 + bass * 0.18 + intensity * 0.16)
+        height = ctx.height * (0.08 + bass * 0.14 + intensity * 0.18)
         height *= 0.72 + _hash_scalar(seed, 7.0) * 0.9
+        height *= 0.5 + activation * 1.05
         phase = ctx.time_seconds * (0.11 + _hash_scalar(seed, 3.0) * 0.08) + seed
         sway = math.sin(phase) * ctx.width * (0.012 + treble * 0.01)
         amount = index / max(1, len(anchors) - 1)
         outer = blend_color((255, 68, 18), palette[1], min(1.0, 0.35 + amount * 0.25))
         middle = blend_color((255, 168, 38), palette[2], 0.28)
         inner = blend_color((255, 238, 126), palette[2], 0.55)
-        alpha = int(255 * opacity * (0.14 + intensity * 0.24 + bass * 0.2))
+        alpha = int(
+            255
+            * opacity
+            * (0.1 + intensity * 0.22 + bass * 0.18)
+            * (0.28 + activation * 1.0)
+        )
         for strand in range(8):
             strand_seed = seed + strand * 0.37
+            strand_activation = activation * (0.58 + _hash_scalar(strand_seed, 16.0) * 0.42)
+            if strand_activation < 0.055:
+                continue
             direction = -1.0 if _hash_scalar(strand_seed, 8.0) < 0.38 else 1.0
             offset = (_hash_scalar(strand_seed, 5.0) - 0.5) * width * 0.48
             x0 = anchor * ctx.width + sway + offset
@@ -277,7 +289,8 @@ def _draw_solar_prominences(
             y3 = _solar_limb_y(ctx, x3) - ctx.height * (
                 0.006 + _hash_scalar(strand_seed, 10.0) * 0.012
             )
-            strand_height = height * (0.45 + _hash_scalar(strand_seed, 7.0) * 0.9)
+            strand_height = height * (0.35 + _hash_scalar(strand_seed, 7.0) * 0.92)
+            strand_height *= 0.68 + strand_activation * 0.62
             twist = math.sin(phase * (1.1 + strand * 0.09)) * ctx.width * 0.034
             c1 = (
                 x0 + direction * width * (0.06 + _hash_scalar(strand_seed, 11.0) * 0.18) + twist,
@@ -288,15 +301,15 @@ def _draw_solar_prominences(
                 y3 - strand_height * (0.45 + _hash_scalar(strand_seed, 14.0) * 0.55),
             )
             points = _cubic_points((x0, y0), c1, c2, (x3, y3), samples=46)
-            width_outer = max(5, int(ctx.height * (0.012 + intensity * 0.011)))
+            width_outer = max(4, int(ctx.height * (0.009 + intensity * 0.01)))
             width_inner = max(1, width_outer // 4)
             glow_draw.line(
                 points,
-                fill=(*outer, max(0, min(98, alpha - 42))),
+                fill=(*outer, max(0, min(120, int((alpha - 24) * strand_activation)))),
                 width=width_outer * 4,
                 joint="curve",
             )
-            sharp_alpha = max(0, min(155, alpha - 18 - strand * 4))
+            sharp_alpha = max(0, min(180, int((alpha + 4 - strand * 3) * strand_activation)))
             sharp_draw.line(
                 points,
                 fill=(*middle, sharp_alpha),
@@ -311,10 +324,33 @@ def _draw_solar_prominences(
                     width=width_inner,
                     joint="curve",
                 )
-            if strand in {0, 3}:
-                _draw_solar_hotspot(glow_draw, palette, opacity, intensity, bass, x0, y0)
+            if strand in {0, 3} and activation > 0.32:
+                _draw_solar_hotspot(
+                    glow_draw,
+                    palette,
+                    opacity,
+                    intensity,
+                    bass,
+                    x0,
+                    y0,
+                    activation,
+                )
     overlay.alpha_composite(glow.filter(ImageFilter.GaussianBlur(radius=max(5, ctx.height // 40))))
     overlay.alpha_composite(sharp)
+
+
+def _music_region_envelope(ctx: FrameContext, index: int) -> float:
+    tempo = float(ctx.features.get("tempo_bpm", 0.0) or 0.0)
+    beat_seconds = 60.0 / tempo if tempo > 1.0 else 0.75
+    cycle = beat_seconds * 8.0
+    start_offset = index * beat_seconds * 1.5
+    phase = ((ctx.time_seconds - start_offset) % cycle) / cycle
+    attack = _scalar_smoothstep(0.0, 0.18, phase)
+    release = 1.0 - _scalar_smoothstep(0.26, 1.0, phase)
+    gate = attack * release
+    slow_pulse = feature_float(ctx.features, "slow_pulse")
+    beat_decay = feature_float(ctx.features, "beat_decay")
+    return _clamp(gate * (0.38 + slow_pulse * 0.72) + beat_decay * 0.24, 0.0, 1.0)
 
 
 def _draw_solar_hotspot(
@@ -325,10 +361,11 @@ def _draw_solar_hotspot(
     bass: float,
     x: float,
     y: float,
+    activation: float,
 ) -> None:
-    radius = 4 + intensity * 10 + bass * 8
+    radius = (3 + intensity * 8 + bass * 7) * (0.45 + activation * 0.75)
     color = blend_color((255, 192, 36), palette[2], 0.45)
-    alpha = int(255 * opacity * (0.18 + intensity * 0.2 + bass * 0.16))
+    alpha = int(255 * opacity * (0.14 + intensity * 0.17 + bass * 0.14) * activation)
     draw.ellipse(
         (x - radius, y - radius * 0.7, x + radius, y + radius * 0.7),
         fill=(*color, max(0, min(230, alpha))),
@@ -669,6 +706,12 @@ def _smoothstep(
 ) -> np.ndarray:
     denominator = np.maximum(0.0001, np.asarray(edge1) - np.asarray(edge0))
     t = np.clip((value - edge0) / denominator, 0.0, 1.0)
+    return t * t * (3.0 - 2.0 * t)
+
+
+def _scalar_smoothstep(edge0: float, edge1: float, value: float) -> float:
+    denominator = max(0.0001, edge1 - edge0)
+    t = _clamp((value - edge0) / denominator, 0.0, 1.0)
     return t * t * (3.0 - 2.0 * t)
 
 
