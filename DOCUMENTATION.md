@@ -209,3 +209,50 @@ ffprobe -v error -show_streams .tmp/test.mp4
 
 - This controls serialized JSON size, not M5 cache retention or eviction policy.
 - M3 visuals should use timeline interpolation instead of assuming feature samples match render FPS.
+
+## 2026-05-01 - M3 First Audio-Reactive Preset
+
+### Changed
+
+- Connected `wavesmith render` to the M2 analyzer and `Timeline`.
+- Added audio-reactive `neon_orb` frame generation driven by per-frame timeline features.
+- Implemented visual modules for:
+  - reactive background
+  - bass/RMS center orb
+  - circular spectrum ring
+  - waveform ribbon
+  - beat shock ring
+  - watermark text
+- Kept ffmpeg muxing and render orchestration inside the render layer.
+- Added tests proving reactive frames change when timeline features change.
+- Hardened orb drawing for very small smoke-test resolutions.
+
+### Validation Run
+
+```bash
+.venv/bin/ruff check .
+.venv/bin/python -m pytest
+.venv/bin/python scripts/generate_test_audio.py .tmp/test.wav --seconds 5
+.venv/bin/wavesmith render .tmp/test.wav .tmp/neon.mp4 --preset neon_orb --resolution 640x360 --fps 15 --max-seconds 5 --watermark "Christian Kajsing // kajsing.com"
+ffprobe -v error -show_streams .tmp/neon.mp4
+```
+
+### Result
+
+- Passed.
+- Unit test suite: 32 tests passed.
+- Smoke render produced `.tmp/neon.mp4`.
+- ffprobe confirmed one 640x360 H.264 video stream with 75 frames and one 5 second AAC audio
+  stream.
+- A preview frame was extracted from the smoke render for visual sanity checking.
+
+### Known Issues And Improvement Notes
+
+- Preset YAML is validated but not yet used to configure module parameters. M4 should make preset
+  modules first-class instead of relying on hardcoded `neon_orb` drawing defaults.
+- Render currently analyzes audio every time. M5 should add cache reuse before full-length renders
+  become routine.
+- Beat/onset response is intentionally simple. M3 visuals should be reviewed with a real music file
+  before tuning pulse widths, spectrum scale, and ribbon motion.
+- The CPU/Pillow renderer is fine for smoke tests, but performance should be measured before larger
+  resolutions or full songs.

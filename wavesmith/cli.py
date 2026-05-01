@@ -112,6 +112,9 @@ def render(
     except FfmpegRenderError as exc:
         console.print(f"[red]Render failed:[/red] {exc}")
         raise typer.Exit(4) from exc
+    except AudioAnalysisError as exc:
+        console.print(f"[red]Audio analysis failed:[/red] {exc}")
+        raise typer.Exit(4) from exc
 
     console.print(f"[green]Rendered:[/green] {output_video} ({duration:.2f}s)")
 
