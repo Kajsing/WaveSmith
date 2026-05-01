@@ -2,6 +2,7 @@
 
 import math
 
+import numpy as np
 from PIL import Image, ImageDraw, ImageFilter
 
 from wavesmith.presets.schema import PresetModule
@@ -25,7 +26,9 @@ def draw_elemental_field(ctx: FrameContext, module: PresetModule | None = None) 
     draw = ImageDraw.Draw(overlay)
     palette = _element_palette(ctx, element)
     if element == "fire":
-        _draw_fire(ctx, draw, palette, bands, density, opacity, intensity, bass, treble, beat)
+        _draw_fire(
+            ctx, overlay, draw, palette, bands, density, opacity, intensity, bass, treble, beat
+        )
     elif element == "water":
         _draw_water(ctx, draw, palette, bands, density, opacity, intensity, bass, treble, beat)
     elif element == "ice":
@@ -45,6 +48,7 @@ def draw_elemental_field(ctx: FrameContext, module: PresetModule | None = None) 
 
 def _draw_fire(
     ctx: FrameContext,
+    overlay: Image.Image,
     draw: ImageDraw.ImageDraw,
     palette: tuple[tuple[int, int, int], tuple[int, int, int], tuple[int, int, int]],
     bands: int,
@@ -55,6 +59,7 @@ def _draw_fire(
     treble: float,
     beat: float,
 ) -> None:
+    _draw_fire_density_field(ctx, overlay, palette, opacity, intensity, bass, treble, beat)
     floor = ctx.height * (0.93 - beat * 0.05)
     flame_height = ctx.height * (0.42 + bass * 0.28 + beat * 0.18)
     for band in range(bands):
@@ -71,6 +76,51 @@ def _draw_fire(
         draw.line(points, fill=color, width=max(3, ctx.height // 55), joint="curve")
     _draw_fire_lashes(ctx, draw, palette, density, opacity, intensity, bass, treble, beat, floor)
     _draw_fire_embers(ctx, draw, palette, density, opacity, intensity, treble, beat, floor)
+
+
+def _draw_fire_density_field(
+    ctx: FrameContext,
+    overlay: Image.Image,
+    palette: tuple[tuple[int, int, int], tuple[int, int, int], tuple[int, int, int]],
+    opacity: float,
+    intensity: float,
+    bass: float,
+    treble: float,
+    beat: float,
+) -> None:
+    field_width = max(96, min(240, ctx.width // 3))
+    field_height = max(54, min(140, ctx.height // 3))
+    x = np.linspace(0.0, 1.0, field_width, dtype=np.float32)
+    y = np.linspace(0.0, 1.0, field_height, dtype=np.float32)
+    xx, yy = np.meshgrid(x, y)
+    height_from_bottom = 1.0 - yy
+    time = np.float32(ctx.time_seconds)
+    scale = 3.2 + treble * 1.4
+    rise = time * (0.52 + bass * 0.35 + beat * 0.25)
+
+    warp_x = _fbm(xx * 2.2 + time * 0.11, yy * 2.6 - rise * 0.22, octaves=3)
+    warp_y = _fbm(xx * 2.8 - time * 0.08, yy * 2.1 - rise * 0.3, octaves=3)
+    warped_x = xx * scale + (warp_x - 0.5) * (0.55 + treble * 0.25)
+    warped_y = yy * (scale * 1.25) - rise + (warp_y - 0.5) * (0.35 + bass * 0.3)
+    turbulence = _fbm(warped_x, warped_y, octaves=5)
+    source_noise = _fbm(xx * 9.0 + time * 0.13, yy * 4.0 - rise * 0.4, octaves=3)
+
+    base_width = 0.78 - height_from_bottom * (0.54 - bass * 0.08)
+    source = np.exp(-((xx - 0.5) ** 2) / np.maximum(0.04, base_width**2))
+    source *= 0.45 + source_noise * 0.65
+    base_feed = 1.0 - _smoothstep(0.0, 0.14, height_from_bottom)
+    vertical_fade = 1.0 - _smoothstep(0.58 + bass * 0.1, 1.0, height_from_bottom)
+    threshold = 0.36 + height_from_bottom * (0.5 - bass * 0.12)
+    threshold += (1.0 - source_noise) * 0.14
+    tongues = _smoothstep(threshold, 1.0, turbulence)
+    density = tongues * source * vertical_fade
+    density += base_feed * (0.22 + bass * 0.18 + beat * 0.08)
+    density = np.clip(density * (1.25 + intensity * 0.55 + beat * 0.22), 0.0, 1.0)
+
+    rgba = _fire_rgba(density, palette, opacity)
+    image = Image.fromarray(rgba, mode="RGBA")
+    image = image.resize((ctx.width, ctx.height), Image.Resampling.BICUBIC)
+    overlay.alpha_composite(image)
 
 
 def _draw_fire_lashes(
@@ -310,6 +360,71 @@ def _rgba(
 ) -> tuple[int, int, int, int]:
     alpha = int(255 * opacity * (0.16 + intensity * 0.32 + beat * 0.18) / (1 + index % 3) ** 0.2)
     return (*color, max(0, min(255, alpha)))
+
+
+def _fire_rgba(
+    density: np.ndarray,
+    palette: tuple[tuple[int, int, int], tuple[int, int, int], tuple[int, int, int]],
+    opacity: float,
+) -> np.ndarray:
+    dark_red = np.array([54, 5, 0], dtype=np.float32)
+    orange = np.array(palette[1], dtype=np.float32)
+    yellow = np.array([255, 188, 42], dtype=np.float32)
+    hot = np.array(palette[2], dtype=np.float32)
+    red_to_orange = _mix_rgb(dark_red, orange, _smoothstep(0.12, 0.62, density))
+    orange_to_yellow = _mix_rgb(red_to_orange, yellow, _smoothstep(0.55, 0.88, density))
+    color = _mix_rgb(orange_to_yellow, hot, _smoothstep(0.84, 1.0, density))
+    alpha = np.clip((density**1.75) * 255 * opacity * 1.05, 0, 255)
+    rgba = np.dstack((color, alpha)).astype(np.uint8)
+    return rgba
+
+
+def _fbm(x: np.ndarray, y: np.ndarray, octaves: int) -> np.ndarray:
+    value = np.zeros_like(x, dtype=np.float32)
+    amplitude = np.float32(0.5)
+    frequency = np.float32(1.0)
+    total = np.float32(0.0)
+    for _ in range(octaves):
+        value += _value_noise(x * frequency, y * frequency) * amplitude
+        total += amplitude
+        frequency *= np.float32(2.02)
+        amplitude *= np.float32(0.52)
+    return value / total
+
+
+def _value_noise(x: np.ndarray, y: np.ndarray) -> np.ndarray:
+    x0 = np.floor(x)
+    y0 = np.floor(y)
+    xf = x - x0
+    yf = y - y0
+    u = xf * xf * (3.0 - 2.0 * xf)
+    v = yf * yf * (3.0 - 2.0 * yf)
+    n00 = _hash2(x0, y0)
+    n10 = _hash2(x0 + 1.0, y0)
+    n01 = _hash2(x0, y0 + 1.0)
+    n11 = _hash2(x0 + 1.0, y0 + 1.0)
+    nx0 = n00 * (1.0 - u) + n10 * u
+    nx1 = n01 * (1.0 - u) + n11 * u
+    return nx0 * (1.0 - v) + nx1 * v
+
+
+def _hash2(x: np.ndarray, y: np.ndarray) -> np.ndarray:
+    value = np.sin(x * 127.1 + y * 311.7) * 43758.5453
+    return value - np.floor(value)
+
+
+def _smoothstep(
+    edge0: float | np.ndarray,
+    edge1: float | np.ndarray,
+    value: np.ndarray,
+) -> np.ndarray:
+    denominator = np.maximum(0.0001, np.asarray(edge1) - np.asarray(edge0))
+    t = np.clip((value - edge0) / denominator, 0.0, 1.0)
+    return t * t * (3.0 - 2.0 * t)
+
+
+def _mix_rgb(a: np.ndarray, b: np.ndarray, amount: np.ndarray) -> np.ndarray:
+    return a * (1.0 - amount[..., None]) + b * amount[..., None]
 
 
 def _clamp(value: float, lower: float, upper: float) -> float:
