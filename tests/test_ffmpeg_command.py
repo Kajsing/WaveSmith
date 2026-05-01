@@ -74,6 +74,13 @@ def test_parse_thumbnail_time_accepts_percent_and_seconds() -> None:
     assert parse_thumbnail_time("12", 10.0) == 10.0
 
 
+def test_parse_thumbnail_time_accepts_named_positions() -> None:
+    assert parse_thumbnail_time("start", 10.0) == 0.0
+    assert parse_thumbnail_time("intro", 10.0) == 1.2
+    assert parse_thumbnail_time("middle", 10.0) == 5.0
+    assert parse_thumbnail_time("end", 10.0) == 8.8
+
+
 def test_parse_thumbnail_time_rejects_invalid_values() -> None:
     with pytest.raises(FfmpegRenderError):
         parse_thumbnail_time("nope", 10.0)

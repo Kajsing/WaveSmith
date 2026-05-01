@@ -1,5 +1,6 @@
 """Preset loading helpers."""
 
+from dataclasses import dataclass
 from pathlib import Path
 
 import yaml
@@ -14,11 +15,38 @@ class PresetError(ValueError):
     """Raised when a preset cannot be loaded or validated."""
 
 
+@dataclass(frozen=True)
+class PresetSummary:
+    """Compact metadata for browsing presets."""
+
+    name: str
+    description: str
+    modules: tuple[str, ...]
+    path: Path
+
+
 def list_builtin_presets() -> list[str]:
     """Return built-in preset names in deterministic order."""
     if not BUILTIN_PRESET_DIR.exists():
         return []
     return sorted(path.stem for path in BUILTIN_PRESET_DIR.glob("*.yaml"))
+
+
+def list_builtin_preset_summaries() -> list[PresetSummary]:
+    """Return validated built-in preset summaries for CLI browsing."""
+    summaries: list[PresetSummary] = []
+    for name in list_builtin_presets():
+        path = resolve_preset_path(name)
+        preset = load_preset(path)
+        summaries.append(
+            PresetSummary(
+                name=preset.name,
+                description=preset.description,
+                modules=tuple(module.type for module in preset.modules),
+                path=path,
+            )
+        )
+    return summaries
 
 
 def resolve_preset_path(name_or_path: str | Path) -> Path:

@@ -4,6 +4,7 @@ from typer.testing import CliRunner
 
 from tests.audio_fixtures import write_test_tone
 from wavesmith.cli import _compact_path, app
+from wavesmith.render.pipeline import RenderResult
 
 runner = CliRunner()
 
@@ -27,6 +28,24 @@ def test_list_presets_shows_builtins() -> None:
     assert "waveform_ribbon" in result.output
 
 
+def test_list_presets_details_shows_descriptions() -> None:
+    result = runner.invoke(app, ["list-presets", "--details"])
+
+    assert result.exit_code == 0
+    assert "Preset" in result.output
+    assert "shader_field" in result.output
+    assert "Layered shader-style light" in result.output
+    assert "fields with bloom" in result.output
+
+
+def test_list_presets_json_writes_metadata() -> None:
+    result = runner.invoke(app, ["list-presets", "--json"])
+
+    assert result.exit_code == 0
+    assert '"name": "neon_orb"' in result.output
+    assert '"modules"' in result.output
+
+
 def test_validate_preset_accepts_builtin_file() -> None:
     result = runner.invoke(app, ["validate-preset", "presets/neon_orb.yaml"])
 
@@ -44,6 +63,18 @@ def test_art_brief_command_writes_json(tmp_path) -> None:
     assert result.exit_code == 0
     assert output.exists()
     assert "Art brief written" in result.output
+
+
+def test_lyrics_inspect_reports_timing_stats(tmp_path) -> None:
+    lyrics = tmp_path / "song.lrc"
+    lyrics.write_text("[00:01.00]one\n[00:04.50]two", encoding="utf-8")
+
+    result = runner.invoke(app, ["lyrics-inspect", str(lyrics)])
+
+    assert result.exit_code == 0
+    assert "Lyrics loaded" in result.output
+    assert "2 cues" in result.output
+    assert "largest_gap" in result.output
 
 
 def test_make_preset_command_writes_valid_yaml(tmp_path) -> None:
@@ -121,6 +152,36 @@ def test_render_rejects_invalid_resolution(tmp_path) -> None:
 
     assert result.exit_code == 2
     assert "even numbers" in result.output
+
+
+def test_preview_uses_low_cost_defaults(monkeypatch, tmp_path) -> None:
+    audio = tmp_path / "song.wav"
+    audio.write_bytes(b"not real audio yet")
+    output = tmp_path / "preview.mp4"
+    seen = {}
+
+    def fake_render(options):
+        seen["options"] = options
+        return RenderResult(
+            duration_seconds=20.0,
+            cache_status="miss",
+            cache_path=tmp_path / "analysis.json",
+            log_path=tmp_path / "render.log",
+            thumbnail_path=tmp_path / "thumb.jpg",
+        )
+
+    monkeypatch.setattr("wavesmith.cli.render_video", fake_render)
+
+    result = runner.invoke(app, ["preview", str(audio), str(output), "--preset", "shader_bloom"])
+
+    assert result.exit_code == 0
+    assert "Rendered" in result.output
+    assert seen["options"].width == 640
+    assert seen["options"].height == 360
+    assert seen["options"].fps == 15
+    assert seen["options"].max_seconds == 20.0
+    assert seen["options"].thumbnail is True
+    assert seen["options"].thumbnail_at == "middle"
 
 
 def test_analyze_writes_json(tmp_path) -> None:

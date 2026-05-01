@@ -124,8 +124,19 @@ def build_rawvideo_command(
 
 
 def parse_thumbnail_time(value: str, duration_seconds: float) -> float:
-    """Parse thumbnail time as seconds or percent of duration."""
+    """Parse thumbnail time as seconds, percent, or a named position."""
     normalized = value.strip().lower()
+    named_positions = {
+        "start": 0.0,
+        "intro": 0.12,
+        "middle": 0.5,
+        "center": 0.5,
+        "end": 0.88,
+        "outro": 0.88,
+    }
+    if normalized in named_positions:
+        return max(0.0, min(duration_seconds, duration_seconds * named_positions[normalized]))
+
     if normalized.endswith("%"):
         try:
             percent = float(normalized[:-1])
@@ -140,7 +151,9 @@ def parse_thumbnail_time(value: str, duration_seconds: float) -> float:
     try:
         seconds = float(normalized)
     except ValueError as exc:
-        raise FfmpegRenderError("Thumbnail time must be seconds or a percent like 50%.") from exc
+        raise FfmpegRenderError(
+            "Thumbnail time must be seconds, a percent like 50%, or start/intro/middle/end."
+        ) from exc
     if seconds < 0:
         raise FfmpegRenderError("Thumbnail time must be greater than or equal to 0.")
     return max(0.0, min(duration_seconds, seconds))

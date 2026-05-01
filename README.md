@@ -36,6 +36,7 @@ wavesmith render song.mp3 out.mp4 --backend cpu
 ## Quick Preview
 
 ```bash
+wavesmith preview song.mp3 preview.mp4 --preset neon_orb
 wavesmith render song.mp3 preview.mp4 --preset neon_orb --resolution 640x360 --fps 15 --max-seconds 20
 ```
 
@@ -69,6 +70,12 @@ WaveSmith can burn timed `.lrc` or `.srt` lyrics into a render:
 wavesmith render song.mp3 lyric-video.mp4 --preset shader_bloom --lyrics song.lrc --lyrics-offset 0.25
 ```
 
+Inspect timing before rendering:
+
+```bash
+wavesmith lyrics-inspect song.lrc
+```
+
 Lyrics can also drive local art direction:
 
 ```bash
@@ -99,6 +106,9 @@ wavesmith ai-prompt song.art.json --target poster --provider openai --out song.a
 wavesmith render song.mp3 preview.mp4 --preset neon_orb --thumbnail --thumbnail-at 50%
 ```
 
+`--thumbnail-at` accepts seconds, percentages, and named positions such as `intro`, `middle`,
+and `end`.
+
 Thumbnails are extracted locally from the rendered MP4 with ffmpeg by default. Use poster style for
 a designed local thumbnail based on preset colors and audio features:
 
@@ -110,6 +120,7 @@ wavesmith render song.mp3 preview.mp4 --preset shader_bloom --thumbnail --thumbn
 
 ```bash
 wavesmith list-presets
+wavesmith list-presets --details
 ```
 
 ## Validate A Preset

@@ -7,19 +7,25 @@ from typing import Annotated
 import typer
 import yaml
 from rich.console import Console
+from rich.table import Table
 
 from wavesmith import __version__
 from wavesmith.ai import build_ai_prompt_manifest
 from wavesmith.art import build_art_brief
 from wavesmith.audio.analyzer import DEFAULT_FEATURE_FPS, AudioAnalysisError, analyze_audio
-from wavesmith.lyrics import LyricsError, load_lyrics
+from wavesmith.lyrics import LyricCue, LyricsError, load_lyrics
 from wavesmith.presets.generator import generate_preset_dict
-from wavesmith.presets.loader import PresetError, list_builtin_presets, load_preset
+from wavesmith.presets.loader import (
+    PresetError,
+    list_builtin_preset_summaries,
+    list_builtin_presets,
+    load_preset,
+)
 from wavesmith.render.backends import RenderBackendError
 from wavesmith.render.batch import run_batch
 from wavesmith.render.ffmpeg import FfmpegMissingError, FfmpegRenderError
 from wavesmith.render.options import RenderOptionsError, build_render_options, parse_resolution
-from wavesmith.render.pipeline import render_video
+from wavesmith.render.pipeline import RenderResult, render_video
 
 app = typer.Typer(
     help="Local-first audio-reactive video generation for music visualizers.",
@@ -45,6 +51,78 @@ def _version_callback(value: bool) -> None:
         raise typer.Exit()
 
 
+def _print_render_summary(output_video: Path, result: RenderResult) -> None:
+    console.print(f"[green]Rendered:[/green] {output_video} ({result.duration_seconds:.2f}s)")
+    console.print(f"analysis_cache={result.cache_status} cache={_compact_path(result.cache_path)}")
+    console.print(f"render_log={_compact_path(result.log_path, keep=26)}")
+    if result.thumbnail_path:
+        console.print(f"thumbnail={_compact_path(result.thumbnail_path, keep=26)}")
+
+
+def _run_render_command(
+    *,
+    input_audio: Path,
+    output_video: Path,
+    preset: str,
+    resolution: str,
+    fps: int,
+    max_seconds: float | None,
+    watermark: str | None,
+    crf: int,
+    ffmpeg_preset: str,
+    backend: str,
+    force_analysis: bool,
+    thumbnail: bool,
+    thumbnail_at: str,
+    thumbnail_style: str,
+    lyrics: Path | None,
+    lyrics_offset: float,
+) -> None:
+    try:
+        options = build_render_options(
+            input_audio=input_audio,
+            output_video=output_video,
+            preset=preset,
+            resolution=resolution,
+            fps=fps,
+            max_seconds=max_seconds,
+            watermark=watermark,
+            crf=crf,
+            ffmpeg_preset=ffmpeg_preset,
+            backend=backend,
+            force_analysis=force_analysis,
+            thumbnail=thumbnail,
+            thumbnail_at=thumbnail_at,
+            thumbnail_style=thumbnail_style,
+            lyrics_path=lyrics,
+            lyrics_offset=lyrics_offset,
+        )
+        result = render_video(options)
+    except RenderOptionsError as exc:
+        console.print(f"[red]Invalid render options:[/red] {exc}")
+        raise typer.Exit(2) from exc
+    except PresetError as exc:
+        console.print(f"[red]Preset error:[/red] {exc}")
+        raise typer.Exit(2) from exc
+    except FfmpegMissingError as exc:
+        console.print(f"[red]Missing dependency:[/red] {exc}")
+        raise typer.Exit(3) from exc
+    except FfmpegRenderError as exc:
+        console.print(f"[red]Render failed:[/red] {exc}")
+        raise typer.Exit(4) from exc
+    except RenderBackendError as exc:
+        console.print(f"[red]Render backend error:[/red] {exc}")
+        raise typer.Exit(4) from exc
+    except AudioAnalysisError as exc:
+        console.print(f"[red]Audio analysis failed:[/red] {exc}")
+        raise typer.Exit(4) from exc
+    except LyricsError as exc:
+        console.print(f"[red]Lyrics error:[/red] {exc}")
+        raise typer.Exit(4) from exc
+
+    _print_render_summary(output_video, result)
+
+
 @app.callback()
 def main(
     version: Annotated[
@@ -56,8 +134,37 @@ def main(
 
 
 @app.command("list-presets")
-def list_presets() -> None:
+def list_presets(
+    details: Annotated[
+        bool,
+        typer.Option("--details", "-d", help="Show descriptions and module stacks."),
+    ] = False,
+    as_json: Annotated[
+        bool,
+        typer.Option("--json", help="Write preset metadata as JSON."),
+    ] = False,
+) -> None:
     """List built-in visual presets."""
+    if as_json:
+        summaries = [
+            {
+                "name": summary.name,
+                "description": summary.description,
+                "modules": list(summary.modules),
+                "path": str(summary.path),
+            }
+            for summary in list_builtin_preset_summaries()
+        ]
+        console.print_json(json.dumps(summaries))
+        return
+
+    if details:
+        table = Table("Preset", "Modules", "Description")
+        for summary in list_builtin_preset_summaries():
+            table.add_row(summary.name, ", ".join(summary.modules), summary.description)
+        console.print(table)
+        return
+
     for preset in list_builtin_presets():
         console.print(preset)
 
@@ -95,6 +202,57 @@ def art_brief(
         console.print(f"[green]Art brief written:[/green] {out}")
     else:
         console.print_json(json.dumps(brief))
+
+
+def _lyrics_stats(cues: list[LyricCue]) -> dict[str, float | int]:
+    total_duration = cues[-1].end - cues[0].start
+    gaps = [
+        max(0.0, cues[index + 1].start - cues[index].end)
+        for index in range(len(cues) - 1)
+    ]
+    overlaps = sum(1 for index in range(len(cues) - 1) if cues[index + 1].start < cues[index].end)
+    return {
+        "cues": len(cues),
+        "start": cues[0].start,
+        "end": cues[-1].end,
+        "duration": total_duration,
+        "largest_gap": max(gaps, default=0.0),
+        "overlaps": overlaps,
+    }
+
+
+@app.command("lyrics-inspect")
+def lyrics_inspect(
+    lyrics: Annotated[Path, typer.Argument(help="Input .lrc or .srt timed lyrics file.")],
+    as_json: Annotated[
+        bool,
+        typer.Option("--json", help="Write timing statistics as JSON."),
+    ] = False,
+) -> None:
+    """Inspect timed lyrics before rendering."""
+    try:
+        cues = load_lyrics(lyrics)
+    except LyricsError as exc:
+        console.print(f"[red]Lyrics error:[/red] {exc}")
+        raise typer.Exit(2) from exc
+
+    stats = _lyrics_stats(cues)
+    if as_json:
+        console.print_json(json.dumps(stats))
+        return
+
+    console.print(f"[green]Lyrics loaded:[/green] {stats['cues']} cues")
+    console.print(
+        f"range={stats['start']:.2f}s..{stats['end']:.2f}s "
+        f"duration={stats['duration']:.2f}s"
+    )
+    console.print(f"largest_gap={stats['largest_gap']:.2f}s overlaps={stats['overlaps']}")
+    if stats["largest_gap"] > 8.0:
+        console.print(
+            "[yellow]Note:[/yellow] large timing gaps may leave long empty lyric sections."
+        )
+    if stats["overlaps"]:
+        console.print("[yellow]Note:[/yellow] overlapping cues can replace each other quickly.")
 
 
 @app.command("make-preset")
@@ -192,7 +350,10 @@ def render(
     ] = False,
     thumbnail_at: Annotated[
         str,
-        typer.Option("--thumbnail-at", help="Thumbnail time in seconds or percent, e.g. 50%."),
+        typer.Option(
+            "--thumbnail-at",
+            help="Thumbnail time: seconds, percent, or start/intro/middle/end.",
+        ),
     ] = "50%",
     thumbnail_style: Annotated[
         str,
@@ -208,53 +369,100 @@ def render(
     ] = 0.0,
 ) -> None:
     """Render one audio file to one MP4 video."""
-    try:
-        options = build_render_options(
-            input_audio=input_audio,
-            output_video=output_video,
-            preset=preset,
-            resolution=resolution,
-            fps=fps,
-            max_seconds=max_seconds,
-            watermark=watermark,
-            crf=crf,
-            ffmpeg_preset=ffmpeg_preset,
-            backend=backend,
-            force_analysis=force_analysis,
-            thumbnail=thumbnail,
-            thumbnail_at=thumbnail_at,
-            thumbnail_style=thumbnail_style,
-            lyrics_path=lyrics,
-            lyrics_offset=lyrics_offset,
-        )
-        result = render_video(options)
-    except RenderOptionsError as exc:
-        console.print(f"[red]Invalid render options:[/red] {exc}")
-        raise typer.Exit(2) from exc
-    except PresetError as exc:
-        console.print(f"[red]Preset error:[/red] {exc}")
-        raise typer.Exit(2) from exc
-    except FfmpegMissingError as exc:
-        console.print(f"[red]Missing dependency:[/red] {exc}")
-        raise typer.Exit(3) from exc
-    except FfmpegRenderError as exc:
-        console.print(f"[red]Render failed:[/red] {exc}")
-        raise typer.Exit(4) from exc
-    except RenderBackendError as exc:
-        console.print(f"[red]Render backend error:[/red] {exc}")
-        raise typer.Exit(4) from exc
-    except AudioAnalysisError as exc:
-        console.print(f"[red]Audio analysis failed:[/red] {exc}")
-        raise typer.Exit(4) from exc
-    except LyricsError as exc:
-        console.print(f"[red]Lyrics error:[/red] {exc}")
-        raise typer.Exit(4) from exc
+    _run_render_command(
+        input_audio=input_audio,
+        output_video=output_video,
+        preset=preset,
+        resolution=resolution,
+        fps=fps,
+        max_seconds=max_seconds,
+        watermark=watermark,
+        crf=crf,
+        ffmpeg_preset=ffmpeg_preset,
+        backend=backend,
+        force_analysis=force_analysis,
+        thumbnail=thumbnail,
+        thumbnail_at=thumbnail_at,
+        thumbnail_style=thumbnail_style,
+        lyrics=lyrics,
+        lyrics_offset=lyrics_offset,
+    )
 
-    console.print(f"[green]Rendered:[/green] {output_video} ({result.duration_seconds:.2f}s)")
-    console.print(f"analysis_cache={result.cache_status} cache={_compact_path(result.cache_path)}")
-    console.print(f"render_log={_compact_path(result.log_path, keep=26)}")
-    if result.thumbnail_path:
-        console.print(f"thumbnail={_compact_path(result.thumbnail_path, keep=26)}")
+
+@app.command()
+def preview(
+    input_audio: Annotated[Path, typer.Argument(help="Input MP3 or WAV file.")],
+    output_video: Annotated[Path, typer.Argument(help="Output MP4 preview path.")],
+    preset: Annotated[str, typer.Option("--preset", help="Built-in preset name.")] = "neon_orb",
+    resolution: Annotated[
+        str,
+        typer.Option("--resolution", help="Preview resolution."),
+    ] = "640x360",
+    fps: Annotated[int, typer.Option("--fps", min=1, help="Preview frames per second.")] = 15,
+    seconds: Annotated[
+        float,
+        typer.Option("--seconds", min=0.1, help="Preview duration limit."),
+    ] = 20.0,
+    watermark: Annotated[str | None, typer.Option("--watermark", help="Watermark text.")] = None,
+    crf: Annotated[
+        int,
+        typer.Option("--crf", min=0, max=51, help="ffmpeg CRF quality value."),
+    ] = 22,
+    ffmpeg_preset: Annotated[
+        str,
+        typer.Option("--ffmpeg-preset", help="ffmpeg encoder preset."),
+    ] = "veryfast",
+    backend: Annotated[
+        str,
+        typer.Option("--backend", help="Render backend: cpu or gpu."),
+    ] = "cpu",
+    force_analysis: Annotated[
+        bool,
+        typer.Option("--force-analysis", help="Bypass analysis cache."),
+    ] = False,
+    thumbnail: Annotated[
+        bool,
+        typer.Option("--thumbnail/--no-thumbnail", help="Extract a JPG thumbnail."),
+    ] = True,
+    thumbnail_at: Annotated[
+        str,
+        typer.Option(
+            "--thumbnail-at",
+            help="Thumbnail time: seconds, percent, or start/intro/middle/end.",
+        ),
+    ] = "middle",
+    thumbnail_style: Annotated[
+        str,
+        typer.Option("--thumbnail-style", help="Thumbnail style: frame or poster."),
+    ] = "frame",
+    lyrics: Annotated[
+        Path | None,
+        typer.Option("--lyrics", help="Optional .lrc or .srt timed lyrics file."),
+    ] = None,
+    lyrics_offset: Annotated[
+        float,
+        typer.Option("--lyrics-offset", help="Shift lyric timings in seconds."),
+    ] = 0.0,
+) -> None:
+    """Render a short low-cost preview with practical defaults."""
+    _run_render_command(
+        input_audio=input_audio,
+        output_video=output_video,
+        preset=preset,
+        resolution=resolution,
+        fps=fps,
+        max_seconds=seconds,
+        watermark=watermark,
+        crf=crf,
+        ffmpeg_preset=ffmpeg_preset,
+        backend=backend,
+        force_analysis=force_analysis,
+        thumbnail=thumbnail,
+        thumbnail_at=thumbnail_at,
+        thumbnail_style=thumbnail_style,
+        lyrics=lyrics,
+        lyrics_offset=lyrics_offset,
+    )
 
 
 @app.command()
@@ -326,7 +534,10 @@ def batch(
     ] = True,
     thumbnail_at: Annotated[
         str,
-        typer.Option("--thumbnail-at", help="Thumbnail time in seconds or percent, e.g. 50%."),
+        typer.Option(
+            "--thumbnail-at",
+            help="Thumbnail time: seconds, percent, or start/intro/middle/end.",
+        ),
     ] = "50%",
     thumbnail_style: Annotated[
         str,
