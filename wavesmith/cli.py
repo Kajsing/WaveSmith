@@ -155,6 +155,10 @@ def render(
         str,
         typer.Option("--thumbnail-at", help="Thumbnail time in seconds or percent, e.g. 50%."),
     ] = "50%",
+    thumbnail_style: Annotated[
+        str,
+        typer.Option("--thumbnail-style", help="Thumbnail style: frame or poster."),
+    ] = "frame",
     lyrics: Annotated[
         Path | None,
         typer.Option("--lyrics", help="Optional .lrc or .srt timed lyrics file."),
@@ -179,6 +183,7 @@ def render(
             force_analysis=force_analysis,
             thumbnail=thumbnail,
             thumbnail_at=thumbnail_at,
+            thumbnail_style=thumbnail_style,
             lyrics_path=lyrics,
             lyrics_offset=lyrics_offset,
         )
@@ -276,6 +281,10 @@ def batch(
         str,
         typer.Option("--thumbnail-at", help="Thumbnail time in seconds or percent, e.g. 50%."),
     ] = "50%",
+    thumbnail_style: Annotated[
+        str,
+        typer.Option("--thumbnail-style", help="Thumbnail style: frame or poster."),
+    ] = "frame",
     stop_on_error: Annotated[
         bool,
         typer.Option("--stop-on-error", help="Stop batch rendering after the first failure."),
@@ -299,6 +308,7 @@ def batch(
             force_analysis=force_analysis,
             thumbnails=thumbnails,
             thumbnail_at=thumbnail_at,
+            thumbnail_style=thumbnail_style,
             stop_on_error=stop_on_error,
         )
     except (ValueError, RenderOptionsError) as exc:

@@ -15,9 +15,11 @@ from wavesmith.render.ffmpeg import (
     build_rawvideo_command,
     encode_raw_frames,
     extract_thumbnail,
+    parse_thumbnail_time,
     probe_duration_seconds,
 )
 from wavesmith.render.options import RenderOptions
+from wavesmith.render.thumbnail import write_poster_thumbnail
 from wavesmith.timeline.model import Timeline
 from wavesmith.utils.logging import render_log_path, write_render_log
 from wavesmith.visuals.background import draw_reactive_background
@@ -82,12 +84,21 @@ def render_video(options: RenderOptions) -> RenderResult:
         )
         thumbnail_path = _thumbnail_path(options)
         if thumbnail_path:
-            extract_thumbnail(
-                input_video=options.output_video,
-                output_image=thumbnail_path,
-                at=options.thumbnail_at,
-                duration_seconds=duration_seconds,
-            )
+            if options.thumbnail_style == "poster":
+                thumbnail_time = parse_thumbnail_time(options.thumbnail_at, duration_seconds)
+                write_poster_thumbnail(
+                    output_image=thumbnail_path,
+                    preset=preset,
+                    features=timeline.at(thumbnail_time),
+                    title=options.input_audio.stem,
+                )
+            else:
+                extract_thumbnail(
+                    input_video=options.output_video,
+                    output_image=thumbnail_path,
+                    at=options.thumbnail_at,
+                    duration_seconds=duration_seconds,
+                )
     except Exception as exc:
         write_render_log(
             path=log_path,

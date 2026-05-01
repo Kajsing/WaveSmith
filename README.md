@@ -67,7 +67,12 @@ wavesmith validate-preset presets/dark_cyber.yaml
 wavesmith render song.mp3 preview.mp4 --preset neon_orb --thumbnail --thumbnail-at 50%
 ```
 
-Thumbnails are extracted locally from the rendered MP4 with ffmpeg.
+Thumbnails are extracted locally from the rendered MP4 with ffmpeg by default. Use poster style for
+a designed local thumbnail based on preset colors and audio features:
+
+```bash
+wavesmith render song.mp3 preview.mp4 --preset shader_bloom --thumbnail --thumbnail-style poster
+```
 
 ## List Presets
 

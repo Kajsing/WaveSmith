@@ -51,6 +51,7 @@ def test_run_batch_writes_summary_and_thumbnails(monkeypatch, tmp_path) -> None:
         force_analysis=False,
         thumbnails=True,
         thumbnail_at="50%",
+        thumbnail_style="frame",
         stop_on_error=False,
     )
 
@@ -86,6 +87,7 @@ def test_run_batch_can_stop_on_error(monkeypatch, tmp_path) -> None:
         force_analysis=False,
         thumbnails=False,
         thumbnail_at="50%",
+        thumbnail_style="frame",
         stop_on_error=True,
     )
 
@@ -109,5 +111,6 @@ def test_run_batch_rejects_missing_input_dir(tmp_path) -> None:
             force_analysis=False,
             thumbnails=False,
             thumbnail_at="50%",
+            thumbnail_style="frame",
             stop_on_error=True,
         )

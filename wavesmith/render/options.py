@@ -25,6 +25,7 @@ class RenderOptions:
     force_analysis: bool = False
     thumbnail: bool = False
     thumbnail_at: str = "50%"
+    thumbnail_style: str = "frame"
     thumbnail_path: Path | None = None
     lyrics_path: Path | None = None
     lyrics_offset: float = 0.0
@@ -65,6 +66,7 @@ def build_render_options(
     force_analysis: bool,
     thumbnail: bool = False,
     thumbnail_at: str = "50%",
+    thumbnail_style: str = "frame",
     thumbnail_path: Path | None = None,
     lyrics_path: Path | None = None,
     lyrics_offset: float = 0.0,
@@ -80,6 +82,8 @@ def build_render_options(
         raise RenderOptionsError("FPS must be at least 1.")
     if max_seconds is not None and max_seconds <= 0:
         raise RenderOptionsError("--max-seconds must be greater than 0.")
+    if thumbnail_style not in {"frame", "poster"}:
+        raise RenderOptionsError("--thumbnail-style must be frame or poster.")
     if lyrics_path is not None:
         if not lyrics_path.exists():
             raise RenderOptionsError(f"Lyric file does not exist: {lyrics_path}")
@@ -102,6 +106,7 @@ def build_render_options(
         force_analysis=force_analysis,
         thumbnail=thumbnail,
         thumbnail_at=thumbnail_at,
+        thumbnail_style=thumbnail_style,
         thumbnail_path=thumbnail_path,
         lyrics_path=lyrics_path,
         lyrics_offset=lyrics_offset,

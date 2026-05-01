@@ -58,11 +58,14 @@ def run_batch(
     force_analysis: bool,
     thumbnails: bool,
     thumbnail_at: str,
+    thumbnail_style: str,
     stop_on_error: bool,
 ) -> BatchSummary:
     """Render all supported audio files in a directory."""
     if not input_dir.exists() or not input_dir.is_dir():
         raise ValueError(f"Input directory does not exist: {input_dir}")
+    if thumbnail_style not in {"frame", "poster"}:
+        raise ValueError("Thumbnail style must be frame or poster.")
 
     output_dir.mkdir(parents=True, exist_ok=True)
     thumbnail_dir = output_dir / "thumbnails"
@@ -86,6 +89,7 @@ def run_batch(
             force_analysis=force_analysis,
             thumbnail=thumbnails,
             thumbnail_at=thumbnail_at,
+            thumbnail_style=thumbnail_style,
             thumbnail_path=thumbnail_path,
         )
         try:
