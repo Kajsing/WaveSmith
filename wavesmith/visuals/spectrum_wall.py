@@ -33,6 +33,7 @@ def draw_spectrum_wall(ctx: FrameContext, module: PresetModule | None = None) ->
     _draw_bars(draw, ctx, spectrum, bars, baseline, max_height, opacity, rms, treble, side_bias)
     if waveform:
         _draw_waveform_beam(draw, ctx, waveform, baseline, opacity, rms, bass)
+    _draw_center_spike(draw, ctx, baseline, max_height, opacity, rms, bass, treble)
 
     glow = overlay.filter(ImageFilter.GaussianBlur(radius=max(2, ctx.height // 100)))
     composited = Image.alpha_composite(ctx.image.convert("RGBA"), glow)
@@ -96,7 +97,7 @@ def _draw_waveform_beam(
         needle = math.sin(index * 0.9 + ctx.time_seconds * 1.7) * amplitude * 0.2
         y = baseline + centered * amplitude + needle
         points.append((x, y))
-    for width, alpha_scale in [(9, 0.2), (5, 0.35), (2, 0.92)]:
+    for width, alpha_scale in [(17, 0.14), (11, 0.22), (6, 0.42), (2, 0.98)]:
         draw.line(
             points,
             fill=(*ctx.palette_beat, int(255 * opacity * alpha_scale)),
@@ -105,5 +106,38 @@ def _draw_waveform_beam(
         )
     draw.line(
         (0, baseline, ctx.width, baseline),
-        fill=(*ctx.palette_beat, int(255 * opacity * 0.5)),
+        fill=(*ctx.palette_beat, int(255 * opacity * 0.72)),
+        width=max(1, ctx.height // 120),
+    )
+
+
+def _draw_center_spike(
+    draw: ImageDraw.ImageDraw,
+    ctx: FrameContext,
+    baseline: float,
+    max_height: float,
+    opacity: float,
+    rms: float,
+    bass: float,
+    treble: float,
+) -> None:
+    center_x = ctx.width / 2
+    spike_height = max_height * (0.45 + rms * 0.55 + bass * 0.25)
+    spike_width = max(2, ctx.width // 170)
+    alpha = int(255 * opacity * (0.42 + treble * 0.35))
+    color = blend_color(ctx.palette_beat, ctx.palette_accent, treble * 0.25)
+    draw.line(
+        (center_x, baseline - spike_height, center_x, baseline + spike_height * 0.62),
+        fill=(*color, max(0, min(255, alpha))),
+        width=spike_width,
+    )
+    draw.line(
+        (
+            center_x - spike_width * 4,
+            baseline,
+            center_x + spike_width * 4,
+            baseline,
+        ),
+        fill=(*ctx.palette_beat, max(0, min(255, alpha))),
+        width=max(1, spike_width // 2),
     )

@@ -15,6 +15,7 @@ def draw_portal_ring(ctx: FrameContext, module: PresetModule | None = None) -> N
     opacity = _clamp(float(module_config.get("opacity", 0.85)), 0.0, 1.0)
     shard_count = max(24, min(int(module_config.get("shards", 120)), 320))
     ring_width = max(4, int(min(ctx.width, ctx.height) * float(module_config.get("width", 0.035))))
+    core_opacity = _clamp(float(module_config.get("core_opacity", 0.42)), 0.0, 1.0)
     design_scale = min(ctx.width, ctx.height) / 720
     radius = min(ctx.width, ctx.height) * float(module_config.get("radius", 0.29))
     radius += feature_float(ctx.features, "bass_energy") * min(ctx.width, ctx.height) * 0.035
@@ -28,6 +29,7 @@ def draw_portal_ring(ctx: FrameContext, module: PresetModule | None = None) -> N
 
     overlay = Image.new("RGBA", (ctx.width, ctx.height), (0, 0, 0, 0))
     draw = ImageDraw.Draw(overlay)
+    _draw_void_core(draw, center_x, center_y, radius, ring_width, core_opacity, bass)
     _draw_ring_core(draw, center_x, center_y, radius, ring_width, palette, opacity, rms, beat)
     if style == "crystal":
         _draw_crystal_shards(
@@ -41,6 +43,18 @@ def draw_portal_ring(ctx: FrameContext, module: PresetModule | None = None) -> N
         _draw_flame_lashes(
             draw, center_x, center_y, radius, shard_count, palette, opacity, bass, treble, beat
         )
+        _draw_flame_wisps(
+            draw,
+            center_x,
+            center_y,
+            radius,
+            shard_count,
+            palette,
+            opacity,
+            bass,
+            treble,
+            ctx.time_seconds,
+        )
     _draw_sparks(
         draw, center_x, center_y, radius, shard_count, palette, opacity, ctx.time_seconds, treble
     )
@@ -49,6 +63,29 @@ def draw_portal_ring(ctx: FrameContext, module: PresetModule | None = None) -> N
     composited = Image.alpha_composite(ctx.image.convert("RGBA"), soft)
     composited = Image.alpha_composite(composited, overlay)
     ctx.image.paste(composited.convert("RGB"))
+
+
+def _draw_void_core(
+    draw: ImageDraw.ImageDraw,
+    center_x: float,
+    center_y: float,
+    radius: float,
+    ring_width: int,
+    core_opacity: float,
+    bass: float,
+) -> None:
+    core_radius = radius - ring_width * (0.85 + bass * 0.3)
+    if core_radius <= 2:
+        return
+    draw.ellipse(
+        (
+            center_x - core_radius,
+            center_y - core_radius,
+            center_x + core_radius,
+            center_y + core_radius,
+        ),
+        fill=(0, 0, 0, int(255 * core_opacity)),
+    )
 
 
 def _draw_ring_core(
@@ -65,7 +102,7 @@ def _draw_ring_core(
     for index in range(5, 0, -1):
         amount = index / 5
         current_radius = radius + (index - 3) * ring_width * 0.55
-        alpha = int(255 * opacity * (0.18 + rms * 0.28 + beat * 0.2) * amount)
+        alpha = int(255 * opacity * (0.28 + rms * 0.34 + beat * 0.24) * amount)
         color = (*_blend3(palette, 1.0 - amount * 0.35), max(0, min(255, alpha)))
         draw.ellipse(
             (
@@ -106,6 +143,44 @@ def _draw_flame_lashes(
         ]
         alpha = int(255 * opacity * (0.28 + bass * 0.42 + beat * 0.22))
         draw.polygon(points, fill=(*_blend3(palette, index / max(1, count - 1)), alpha))
+
+
+def _draw_flame_wisps(
+    draw: ImageDraw.ImageDraw,
+    center_x: float,
+    center_y: float,
+    radius: float,
+    count: int,
+    palette: tuple[tuple[int, int, int], tuple[int, int, int], tuple[int, int, int]],
+    opacity: float,
+    bass: float,
+    treble: float,
+    time_seconds: float,
+) -> None:
+    wisp_count = max(28, count // 5)
+    for index in range(wisp_count):
+        angle = -math.pi * (0.08 + (index / max(1, wisp_count - 1)) * 0.84)
+        angle += math.sin(index * 1.19 + time_seconds * 0.7) * 0.12
+        start_radius = radius * (0.92 + (index % 5) * 0.018)
+        crown_boost = max(0.25, -math.sin(angle))
+        length = radius * (0.26 + bass * 0.4 + treble * 0.18) * crown_boost
+        points: list[tuple[float, float]] = []
+        for segment in range(7):
+            amount = segment / 6
+            curl = math.sin(segment * 1.7 + index * 0.61 + time_seconds * (1.0 + treble)) * 0.16
+            current_angle = angle + curl * amount
+            current_radius = start_radius + length * amount
+            x, y = _polar(center_x, center_y, current_angle, current_radius)
+            y -= math.sin(amount * math.pi) * radius * (0.14 + bass * 0.18) * crown_boost
+            points.append((x, y))
+        alpha = int(255 * opacity * (0.28 + bass * 0.36 + treble * 0.18) * crown_boost)
+        color = _blend3(palette, 0.45 + (index % 7) / 14)
+        draw.line(
+            points,
+            fill=(*color, max(0, min(255, alpha))),
+            width=max(1, int(radius // 42)),
+            joint="curve",
+        )
 
 
 def _draw_crystal_shards(

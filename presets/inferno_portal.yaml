@@ -50,6 +50,7 @@ modules:
     width: 0.052
     shards: 260
     opacity: 0.95
+    core_opacity: 0.58
   - type: elemental_field
     id: fire_lift
     element: fire
