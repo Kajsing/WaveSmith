@@ -109,5 +109,36 @@ ffprobe -v error -show_streams .tmp/test.mp4
 ### Known Issues
 
 - Frames are deterministic placeholder visuals, not audio-reactive yet.
-- Audio is re-encoded to AAC for MP4 compatibility.
+- Audio is re-encoded to AAC for MP4 compatibility. A future milestone should decide whether
+  "original audio" means preserving the exact codec/stream where possible or including the same
+  source audio content in an MP4-compatible form.
 - Render logs and analysis cache remain future milestones.
+
+## 2026-05-01 - M1 Hardening
+
+### Changed
+
+- Added CLI validation tests for missing input files, invalid output extension, and invalid
+  resolution.
+- Added ffmpeg/ffprobe failure tests for missing binaries and invalid audio probing.
+- Added `verify_media_streams` to programmatically check whether smoke outputs contain video and
+  audio streams.
+- Added an optional smoke-output sanity test for `.tmp/test.mp4` when that local file exists.
+
+### Validation Run
+
+```bash
+.venv/bin/ruff check .
+.venv/bin/python -m pytest
+.venv/bin/python scripts/generate_test_audio.py .tmp/test.wav --seconds 5
+.venv/bin/wavesmith render .tmp/test.wav .tmp/test.mp4 --preset neon_orb --resolution 640x360 --fps 15 --max-seconds 5
+.venv/bin/python -m pytest tests/test_smoke_helpers.py
+```
+
+### Result
+
+- Passed.
+- Unit test suite: 20 tests passed.
+- Smoke render succeeded.
+- Smoke-output sanity test confirmed `.tmp/test.mp4` has a non-zero file size plus video and audio
+  streams.

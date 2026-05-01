@@ -49,6 +49,27 @@ def probe_duration_seconds(input_audio: Path) -> float:
     return duration
 
 
+def verify_media_streams(output_video: Path) -> tuple[bool, bool]:
+    """Return whether a media file contains at least one video and one audio stream."""
+    ffprobe = require_binary("ffprobe")
+    command = [
+        ffprobe,
+        "-v",
+        "error",
+        "-show_entries",
+        "stream=codec_type",
+        "-of",
+        "csv=p=0",
+        str(output_video),
+    ]
+    result = subprocess.run(command, capture_output=True, check=False, text=True)
+    if result.returncode != 0:
+        raise FfmpegRenderError(result.stderr.strip() or "ffprobe could not read media streams.")
+
+    stream_types = {line.strip() for line in result.stdout.splitlines()}
+    return "video" in stream_types, "audio" in stream_types
+
+
 def build_rawvideo_command(
     *,
     input_audio: Path,
