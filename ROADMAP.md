@@ -1,14 +1,15 @@
 # WaveSmith Roadmap
 
 WaveSmith starts as a local-first music visualizer. The future direction is a local creative engine
-that can use lyrics, art direction, optional AI assistance, and eventually GPU/shader rendering
-without compromising the offline MVP.
+that can use richer shader-style visuals, lyrics, art direction, optional AI assistance, and
+eventually GPU acceleration without compromising the offline MVP.
 
 ## Principles
 
 - Keep core rendering local by default.
 - Never upload user audio, lyrics, or generated media without explicit opt-in.
 - Keep CPU rendering as the reference implementation and fallback.
+- Treat shader-style art direction as a core creative feature, not only an optimization.
 - Use AI assistance for art direction, preset generation, transcription, or poster concepts, not as
   a hard dependency for normal rendering.
 - Prefer structured outputs such as JSON and YAML over arbitrary generated code.
@@ -47,7 +48,36 @@ python -m pytest
 
 Done when multiple real songs produce acceptable videos without code changes.
 
-## v0.3 - Lyrics Display
+## v0.3 - Shader Visual Language
+
+Goal: make WaveSmith noticeably more expressive before changing the backend.
+
+This milestone focuses on "shader thinking" in the current renderer: layered fields, glow,
+distortion, trails, palettes, masks, and audio-reactive parameters that can later map cleanly onto
+a GPU backend.
+
+Deliverables:
+
+- Add a shader-style preset/module vocabulary for richer visuals.
+- Add layered glow, bloom-like softness, trails, and motion smear where practical.
+- Add audio-reactive distortion, pulse, rotation, field strength, and palette shifts.
+- Add reusable visual primitives for rings, orbs, spectrum fields, waveform ribbons, and particles.
+- Extend preset YAML so modules can express intensity curves and blend modes.
+- Keep all new effects available through CPU rendering first.
+- Add performance notes for the heavier effects and define sensible preview defaults.
+
+Validation:
+
+```bash
+wavesmith render .tmp/music/song.mp3 .tmp/music/song-shader-preview.mp4 --preset neon_orb --resolution 640x360 --fps 15 --max-seconds 20 --thumbnail
+wavesmith render .tmp/music/song.mp3 .tmp/music/song-shader-1080p.mp4 --preset neon_orb --resolution 1920x1080 --fps 30 --max-seconds 10
+python -m pytest
+```
+
+Done when at least one preset feels like a real visual upgrade, renders reliably on CPU, and has a
+clear path to GPU acceleration later.
+
+## v0.4 - Lyrics Display
 
 Goal: support lyrics when timed lyric files are already available.
 
@@ -76,7 +106,7 @@ Validation:
 
 Done when timed lyrics can be displayed clearly without requiring transcription.
 
-## v0.4 - Lyrics As Art Direction
+## v0.5 - Lyrics As Art Direction
 
 Goal: use lyrics as a creative signal, not only on-screen text.
 
@@ -101,7 +131,7 @@ Possible art brief:
 
 Done when a lyric file can influence preset selection or preset YAML without hand editing.
 
-## v0.5 - Prompt-To-Preset
+## v0.6 - Prompt-To-Preset
 
 Goal: let users describe a style and receive editable preset YAML.
 
@@ -120,7 +150,7 @@ Rules:
 
 Done when generated presets validate and render.
 
-## v0.6 - Poster Thumbnails
+## v0.7 - Poster Thumbnails
 
 Goal: move beyond frame extraction when the user wants more intentional thumbnails.
 
@@ -134,17 +164,18 @@ Deliverables:
 
 Done when thumbnails can be either faithful extracted frames or more designed poster images.
 
-## v0.7 - GPU/Shader Backend
+## v0.8 - GPU Render Backend
 
-Goal: improve render quality and speed for high-resolution visuals.
+Goal: make the shader visual language faster and more scalable for high-resolution visuals.
 
 Deliverables:
 
 - Define `RenderBackend`.
 - Move current Pillow renderer behind `CpuRenderBackend`.
 - Add `--backend cpu|gpu`.
-- Prototype ModernGL or shader backend.
-- Start with orb/ring rendering.
+- Prototype ModernGL or another local GPU path.
+- Port the v0.3 shader-style primitives to the GPU backend incrementally.
+- Start with orb/ring rendering, glow fields, and palette shifts.
 - Keep CPU fallback working unchanged.
 
 Validation:
@@ -152,10 +183,11 @@ Validation:
 - CPU and GPU backends render the same song.
 - GPU backend can render a short 1080p preview.
 - Visual output is nonblank and audio muxing still works.
+- GPU render timing is tracked against CPU timing for the same preset and resolution.
 
 Done when GPU rendering can be selected explicitly and CPU remains the stable fallback.
 
-## v0.8 - Optional AI Assist
+## v0.9 - Optional AI Assist
 
 Goal: use external AI only where it clearly helps and only with user consent.
 

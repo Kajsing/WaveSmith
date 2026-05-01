@@ -73,5 +73,5 @@ Rendered videos, user audio, logs, and large analysis caches should not be commi
 
 ## Roadmap
 
-See `ROADMAP.md` for planned future work, including lyrics display, lyrics-driven art direction,
-poster thumbnails, optional AI assistance, and GPU/shader rendering.
+See `ROADMAP.md` for planned future work, including shader-style visual upgrades, lyrics display,
+lyrics-driven art direction, poster thumbnails, optional AI assistance, and GPU acceleration.
