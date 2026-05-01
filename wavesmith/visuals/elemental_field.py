@@ -154,17 +154,21 @@ def _draw_fire_density_field(
         tongues = _smoothstep(threshold, 0.88, turbulence + source_noise * 0.08)
         core_falloff = 1.0 - _smoothstep(0.0, flame_limit * 0.78, height_from_bottom)
         core = source * core_falloff * (0.22 + flare * 0.12)
-        ridges = 1.0 - np.abs(
-            np.sin((xx * (5.4 + treble * 1.4) + (warp_x - 0.5) * 0.42) * math.tau)
+        plume_noise = _fbm(
+            xx * (7.0 + treble * 1.2) + warp_x * 1.25 + time * 0.07,
+            yy * 1.6 - rise * 0.26 + warp_y * 0.9,
+            octaves=4,
         )
-        ridges = _smoothstep(0.54, 0.96, ridges + source_noise * 0.18)
+        plume_gate = _smoothstep(0.47, 0.86, plume_noise + source_noise * 0.12)
         tongue_ceiling = flame_limit * (0.58 + source_noise * 0.42)
         tongue_fade = 1.0 - _smoothstep(tongue_ceiling, tongue_ceiling + 0.18, height_from_bottom)
         vertical_pull = _smoothstep(0.05, 0.26, height_from_bottom)
-        density = tongues * source * vertical_fade * (0.78 + base_feed * 0.32)
-        density += ridges * source * tongue_fade * vertical_pull * (0.5 + flare * 0.25)
-        density += core + base_feed * source * (0.26 + bass * 0.14 + beat * 0.06)
-        density *= 1.24 + intensity * 0.44 + beat * 0.18
+        irregular_licks = _fire_irregular_licks(xx, height_from_bottom, warp_x, flame_limit, time)
+        density = tongues * source * vertical_fade * (0.45 + base_feed * 0.22)
+        density += plume_gate * source * tongue_fade * vertical_pull * (0.16 + flare * 0.1)
+        density += irregular_licks * source * vertical_fade * (0.38 + flare * 0.18)
+        density += core * 0.62 + base_feed * source * (0.2 + bass * 0.1 + beat * 0.04)
+        density *= 1.18 + intensity * 0.34 + beat * 0.14
     else:
         base_width = 0.78 - height_from_bottom * (0.54 - bass * 0.08)
         source = np.exp(-((xx - 0.5) ** 2) / np.maximum(0.04, base_width**2))
@@ -183,6 +187,33 @@ def _draw_fire_density_field(
     image = Image.fromarray(rgba, mode="RGBA")
     image = image.resize((ctx.width, ctx.height), Image.Resampling.BICUBIC)
     overlay.alpha_composite(image)
+
+
+def _fire_irregular_licks(
+    xx: np.ndarray,
+    height_from_bottom: np.ndarray,
+    warp_x: np.ndarray,
+    flame_limit: float,
+    time: np.float32,
+) -> np.ndarray:
+    plumes = np.zeros_like(xx, dtype=np.float32)
+    for index in range(16):
+        seed = float(index) + 1.0
+        center = 0.04 + _hash_scalar(seed, 2.1) * 0.92
+        width = 0.018 + _hash_scalar(seed, 4.7) * 0.036
+        height = flame_limit * (0.36 + _hash_scalar(seed, 7.3) * 0.62)
+        phase = float(time) * (0.38 + _hash_scalar(seed, 8.9) * 0.46) + seed
+        sway = np.sin(height_from_bottom * math.tau * (0.8 + _hash_scalar(seed, 5.4)) + phase)
+        local_center = center + sway * 0.018 + (warp_x - 0.5) * 0.045
+        height_amount = np.clip(height_from_bottom / max(0.001, height), 0.0, 1.0)
+        local_width = width * (1.22 - height_amount * 0.74)
+        distance = xx - local_center
+        column = np.exp(-(distance * distance) / np.maximum(0.00012, local_width * local_width))
+        lift = _smoothstep(0.025, 0.18, height_from_bottom)
+        falloff = 1.0 - _smoothstep(height, height + 0.16, height_from_bottom)
+        sharpen = 1.18 + height_amount * 1.35
+        plumes += (column**sharpen) * lift * falloff * (0.65 + _hash_scalar(seed, 12.4) * 0.35)
+    return np.clip(plumes, 0.0, 1.0)
 
 
 def _draw_fire_base_glow(
@@ -502,6 +533,11 @@ def _value_noise(x: np.ndarray, y: np.ndarray) -> np.ndarray:
 def _hash2(x: np.ndarray, y: np.ndarray) -> np.ndarray:
     value = np.sin(x * 127.1 + y * 311.7) * 43758.5453
     return value - np.floor(value)
+
+
+def _hash_scalar(x: float, y: float) -> float:
+    value = math.sin(x * 127.1 + y * 311.7) * 43758.5453
+    return value - math.floor(value)
 
 
 def _smoothstep(
