@@ -9,11 +9,13 @@ import yaml
 from rich.console import Console
 
 from wavesmith import __version__
+from wavesmith.ai import build_ai_prompt_manifest
 from wavesmith.art import build_art_brief
 from wavesmith.audio.analyzer import DEFAULT_FEATURE_FPS, AudioAnalysisError, analyze_audio
 from wavesmith.lyrics import LyricsError, load_lyrics
 from wavesmith.presets.generator import generate_preset_dict
 from wavesmith.presets.loader import PresetError, list_builtin_presets, load_preset
+from wavesmith.render.backends import RenderBackendError
 from wavesmith.render.batch import run_batch
 from wavesmith.render.ffmpeg import FfmpegMissingError, FfmpegRenderError
 from wavesmith.render.options import RenderOptionsError, build_render_options, parse_resolution
@@ -120,6 +122,39 @@ def make_preset(
     console.print(f"[green]Preset written:[/green] {out}")
 
 
+@app.command("ai-prompt")
+def ai_prompt(
+    art_brief_file: Annotated[Path, typer.Argument(help="Input art brief JSON file.")],
+    out: Annotated[Path, typer.Option("--out", help="Output AI prompt manifest JSON path.")],
+    target: Annotated[
+        str,
+        typer.Option("--target", help="AI assist target: preset, poster, or lyrics_timing."),
+    ] = "preset",
+    provider: Annotated[
+        str,
+        typer.Option("--provider", help="Optional provider label, e.g. openai or huggingface."),
+    ] = "generic",
+) -> None:
+    """Prepare a local prompt manifest for an optional AI workflow."""
+    if not art_brief_file.exists():
+        console.print(f"[red]Art brief file does not exist:[/red] {art_brief_file}")
+        raise typer.Exit(2)
+    try:
+        art_brief = json.loads(art_brief_file.read_text(encoding="utf-8"))
+        manifest = build_ai_prompt_manifest(
+            art_brief=art_brief,
+            target=target,  # type: ignore[arg-type]
+            provider=provider,
+        )
+    except (json.JSONDecodeError, ValueError) as exc:
+        console.print(f"[red]AI prompt error:[/red] {exc}")
+        raise typer.Exit(2) from exc
+
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    console.print(f"[green]AI prompt manifest written:[/green] {out}")
+
+
 @app.command()
 def render(
     input_audio: Annotated[Path, typer.Argument(help="Input MP3 or WAV file.")],
@@ -143,6 +178,10 @@ def render(
         str,
         typer.Option("--ffmpeg-preset", help="ffmpeg encoder preset."),
     ] = "medium",
+    backend: Annotated[
+        str,
+        typer.Option("--backend", help="Render backend: cpu or gpu."),
+    ] = "cpu",
     force_analysis: Annotated[
         bool,
         typer.Option("--force-analysis", help="Bypass any future analysis cache."),
@@ -180,6 +219,7 @@ def render(
             watermark=watermark,
             crf=crf,
             ffmpeg_preset=ffmpeg_preset,
+            backend=backend,
             force_analysis=force_analysis,
             thumbnail=thumbnail,
             thumbnail_at=thumbnail_at,
@@ -199,6 +239,9 @@ def render(
         raise typer.Exit(3) from exc
     except FfmpegRenderError as exc:
         console.print(f"[red]Render failed:[/red] {exc}")
+        raise typer.Exit(4) from exc
+    except RenderBackendError as exc:
+        console.print(f"[red]Render backend error:[/red] {exc}")
         raise typer.Exit(4) from exc
     except AudioAnalysisError as exc:
         console.print(f"[red]Audio analysis failed:[/red] {exc}")
@@ -266,6 +309,10 @@ def batch(
         str,
         typer.Option("--ffmpeg-preset", help="ffmpeg encoder preset."),
     ] = "medium",
+    backend: Annotated[
+        str,
+        typer.Option("--backend", help="Render backend: cpu or gpu."),
+    ] = "cpu",
     force_analysis: Annotated[
         bool,
         typer.Option("--force-analysis", help="Bypass analysis cache for every item."),
@@ -305,6 +352,7 @@ def batch(
             watermark=watermark,
             crf=crf,
             ffmpeg_preset=ffmpeg_preset,
+            backend=backend,
             force_analysis=force_analysis,
             thumbnails=thumbnails,
             thumbnail_at=thumbnail_at,

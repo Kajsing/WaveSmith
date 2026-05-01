@@ -1,16 +1,14 @@
 """Render pipeline orchestration."""
 
-import math
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
-from PIL import Image, ImageDraw
-
 from wavesmith.audio.cache import CachedAnalysis, load_or_analyze_audio
-from wavesmith.lyrics import LyricCue, active_lyric_text, load_lyrics
+from wavesmith.lyrics import LyricCue, load_lyrics
 from wavesmith.presets.loader import load_preset
-from wavesmith.presets.schema import PresetConfig, PresetModule
+from wavesmith.presets.schema import PresetConfig
+from wavesmith.render.backends import CpuRenderBackend, get_render_backend
 from wavesmith.render.ffmpeg import (
     build_rawvideo_command,
     encode_raw_frames,
@@ -22,14 +20,6 @@ from wavesmith.render.options import RenderOptions
 from wavesmith.render.thumbnail import write_poster_thumbnail
 from wavesmith.timeline.model import Timeline
 from wavesmith.utils.logging import render_log_path, write_render_log
-from wavesmith.visuals.background import draw_reactive_background
-from wavesmith.visuals.base import FrameContext
-from wavesmith.visuals.center_orb import draw_center_orb
-from wavesmith.visuals.particles import draw_particles
-from wavesmith.visuals.shader_field import draw_shader_field
-from wavesmith.visuals.spectrum_ring import draw_spectrum_ring
-from wavesmith.visuals.text import draw_lyrics, draw_watermark
-from wavesmith.visuals.waveform_ribbon import draw_waveform_ribbon
 
 
 @dataclass(frozen=True)
@@ -72,14 +62,16 @@ def render_video(options: RenderOptions) -> RenderResult:
             crf=options.crf,
             ffmpeg_preset=options.ffmpeg_preset,
         )
+        backend = get_render_backend(options.backend)
         encode_raw_frames(
             command=command,
-            frames=generate_reactive_frames(
-                options,
-                duration_seconds,
-                timeline,
-                preset,
+            frames=backend.generate_frames(
+                options=options,
+                duration_seconds=duration_seconds,
+                timeline=timeline,
+                preset=preset,
                 lyrics=lyrics,
+                watermark_text=_watermark_text(options, preset),
             ),
         )
         thumbnail_path = _thumbnail_path(options)
@@ -150,37 +142,14 @@ def generate_reactive_frames(
     """Yield RGB frames driven by timeline features."""
     preset = preset or load_preset(options.preset)
     lyrics = lyrics or []
-    frame_count = max(1, math.ceil(duration_seconds * options.fps))
-    width = options.width
-    height = options.height
-
-    for frame_index in range(frame_count):
-        progress = frame_index / max(1, frame_count - 1)
-        time_seconds = frame_index / options.fps
-        features = timeline.at(time_seconds)
-        image = Image.new("RGB", (width, height), (0, 0, 0))
-        draw = ImageDraw.Draw(image)
-        ctx = FrameContext(
-            image=image,
-            draw=draw,
-            width=width,
-            height=height,
-            time_seconds=time_seconds,
-            progress=progress,
-            features=features,
-            preset_name=preset.name,
-            palette_base=preset.palette.base,
-            palette_accent=preset.palette.accent,
-            palette_beat=preset.palette.beat,
-        )
-
-        draw_reactive_background(ctx)
-        for module in preset.modules:
-            _draw_module(ctx, module)
-        draw_lyrics(ctx, active_lyric_text(lyrics, time_seconds, options.lyrics_offset))
-        draw_watermark(ctx, _watermark_text(options, preset))
-
-        yield image.tobytes()
+    yield from CpuRenderBackend().generate_frames(
+        options=options,
+        duration_seconds=duration_seconds,
+        timeline=timeline,
+        preset=preset,
+        lyrics=lyrics,
+        watermark_text=_watermark_text(options, preset),
+    )
 
 
 def generate_placeholder_frames(
@@ -209,19 +178,6 @@ def generate_placeholder_frames(
         waveform_preview=vector,
     )
     yield from generate_reactive_frames(options, duration_seconds, Timeline(analysis))
-
-
-def _draw_module(ctx: FrameContext, module: PresetModule) -> None:
-    if module.type == "center_orb":
-        draw_center_orb(ctx, module)
-    elif module.type == "spectrum_ring":
-        draw_spectrum_ring(ctx, module)
-    elif module.type == "waveform_ribbon":
-        draw_waveform_ribbon(ctx, module)
-    elif module.type == "particles":
-        draw_particles(ctx, module)
-    elif module.type == "shader_field":
-        draw_shader_field(ctx, module)
 
 
 def _watermark_text(options: RenderOptions, preset: PresetConfig) -> str | None:

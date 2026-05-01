@@ -64,6 +64,33 @@ def test_make_preset_command_writes_valid_yaml(tmp_path) -> None:
     assert "Preset written" in result.output
 
 
+def test_ai_prompt_command_writes_manifest(tmp_path) -> None:
+    art_brief = tmp_path / "song.art.json"
+    output = tmp_path / "song.ai.json"
+    art_brief.write_text(
+        '{"mood":["dark"],"imagery":["low light"],"palette":["cyan"],"motion":"slow"}',
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "ai-prompt",
+            str(art_brief),
+            "--target",
+            "poster",
+            "--provider",
+            "openai",
+            "--out",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert output.exists()
+    assert "AI prompt manifest written" in result.output
+
+
 def test_render_rejects_missing_input() -> None:
     result = runner.invoke(app, ["render", "missing.wav", "out.mp4"])
 

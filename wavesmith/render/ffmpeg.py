@@ -195,6 +195,15 @@ def encode_raw_frames(
     except BrokenPipeError as exc:
         _, stderr = process.communicate()
         raise FfmpegRenderError(stderr.decode("utf-8", errors="replace").strip()) from exc
+    except Exception:
+        if process.stdin and not process.stdin.closed:
+            process.stdin.close()
+        try:
+            process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait()
+        raise
     finally:
         if process.stdin and not process.stdin.closed:
             process.stdin.close()

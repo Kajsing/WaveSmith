@@ -26,6 +26,13 @@ pip install -e .[dev]
 wavesmith render song.mp3 out.mp4 --preset neon_orb --resolution 1920x1080 --fps 30
 ```
 
+CPU is the stable reference backend. The `gpu` backend flag is reserved for the future shader
+renderer and currently fails explicitly instead of silently falling back:
+
+```bash
+wavesmith render song.mp3 out.mp4 --backend cpu
+```
+
 ## Quick Preview
 
 ```bash
@@ -59,6 +66,15 @@ Generate editable preset YAML locally from a short style prompt:
 ```bash
 wavesmith make-preset "dark cyberpunk shader bloom" --name dark_cyber --out presets/dark_cyber.yaml
 wavesmith validate-preset presets/dark_cyber.yaml
+```
+
+## Optional AI Assist
+
+WaveSmith does not upload audio, lyrics, or art briefs by default. You can prepare a local AI prompt
+manifest for a later explicit OpenAI/Hugging Face workflow:
+
+```bash
+wavesmith ai-prompt song.art.json --target poster --provider openai --out song.ai-prompt.json
 ```
 
 ## Thumbnail

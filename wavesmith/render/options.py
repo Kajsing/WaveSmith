@@ -22,6 +22,7 @@ class RenderOptions:
     watermark: str | None
     crf: int
     ffmpeg_preset: str
+    backend: str = "cpu"
     force_analysis: bool = False
     thumbnail: bool = False
     thumbnail_at: str = "50%"
@@ -63,6 +64,7 @@ def build_render_options(
     watermark: str | None,
     crf: int,
     ffmpeg_preset: str,
+    backend: str = "cpu",
     force_analysis: bool,
     thumbnail: bool = False,
     thumbnail_at: str = "50%",
@@ -82,6 +84,8 @@ def build_render_options(
         raise RenderOptionsError("FPS must be at least 1.")
     if max_seconds is not None and max_seconds <= 0:
         raise RenderOptionsError("--max-seconds must be greater than 0.")
+    if backend not in {"cpu", "gpu"}:
+        raise RenderOptionsError("--backend must be cpu or gpu.")
     if thumbnail_style not in {"frame", "poster"}:
         raise RenderOptionsError("--thumbnail-style must be frame or poster.")
     if lyrics_path is not None:
@@ -103,6 +107,7 @@ def build_render_options(
         watermark=watermark,
         crf=crf,
         ffmpeg_preset=ffmpeg_preset,
+        backend=backend,
         force_analysis=force_analysis,
         thumbnail=thumbnail,
         thumbnail_at=thumbnail_at,

@@ -55,6 +55,7 @@ def run_batch(
     watermark: str | None,
     crf: int,
     ffmpeg_preset: str,
+    backend: str,
     force_analysis: bool,
     thumbnails: bool,
     thumbnail_at: str,
@@ -64,6 +65,8 @@ def run_batch(
     """Render all supported audio files in a directory."""
     if not input_dir.exists() or not input_dir.is_dir():
         raise ValueError(f"Input directory does not exist: {input_dir}")
+    if backend not in {"cpu", "gpu"}:
+        raise ValueError("Render backend must be cpu or gpu.")
     if thumbnail_style not in {"frame", "poster"}:
         raise ValueError("Thumbnail style must be frame or poster.")
 
@@ -86,6 +89,7 @@ def run_batch(
             watermark=watermark,
             crf=crf,
             ffmpeg_preset=ffmpeg_preset,
+            backend=backend,
             force_analysis=force_analysis,
             thumbnail=thumbnails,
             thumbnail_at=thumbnail_at,

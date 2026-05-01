@@ -96,3 +96,23 @@ def test_render_options_rejects_unsupported_thumbnail_style(tmp_path: Path) -> N
             force_analysis=False,
             thumbnail_style="ai_magic",
         )
+
+
+def test_render_options_rejects_unsupported_backend(tmp_path: Path) -> None:
+    audio = tmp_path / "song.mp3"
+    audio.write_bytes(b"fake")
+
+    with pytest.raises(RenderOptionsError, match="cpu or gpu"):
+        build_render_options(
+            input_audio=audio,
+            output_video=tmp_path / "out.mp4",
+            preset="neon_orb",
+            resolution="640x360",
+            fps=15,
+            max_seconds=5,
+            watermark=None,
+            crf=18,
+            ffmpeg_preset="medium",
+            force_analysis=False,
+            backend="metal",
+        )

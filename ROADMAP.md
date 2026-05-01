@@ -26,6 +26,18 @@ WaveSmith can:
 - Batch render folders.
 - Extract local thumbnails from rendered MP4 files.
 
+## Implemented Roadmap Slices
+
+The following future-facing slices have been pulled into the project after MVP:
+
+- Shader-style visual language through `shader_bloom`, `shader_field`, orb glow, and rotating rings.
+- Timed `.lrc` and `.srt` lyric display with offset support.
+- Local lyric-to-art-brief JSON generation.
+- Local prompt-to-preset YAML generation with schema validation.
+- Local poster-style thumbnails in addition to ffmpeg frame extraction.
+- Explicit render backend selection with CPU as the stable backend and GPU reserved for future work.
+- Local AI prompt manifests for optional OpenAI/Hugging Face workflows without automatic upload.
+
 ## v0.2 - Real Music Validation And Art Pass
 
 Goal: make the MVP feel better on real songs before adding more system complexity.
