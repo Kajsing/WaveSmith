@@ -1,0 +1,93 @@
+name: elemental_storm
+version: 1
+description: Fire, water, and plasma layers wrapped around a high-energy shader visualizer.
+
+canvas:
+  background: radial_void
+  glow: true
+
+palette:
+  mode: reactive
+  base: [34, 214, 255]
+  accent: [255, 76, 64]
+  beat: [255, 246, 210]
+
+watermark:
+  enabled: true
+  text: "Christian Kajsing // kajsing.com"
+  position: bottom_right
+  opacity: 0.5
+
+modules:
+  - type: elemental_field
+    id: water_pressure
+    element: water
+    bands: 6
+    density: 64
+    blur: 7
+    opacity: 0.48
+    intensity_feature: rms
+    bass_feature: bass_energy
+    motion_feature: treble_energy
+  - type: shader_field
+    id: vortex_depth
+    style: vortex
+    layers: 5
+    density: 66
+    blur: 5
+    opacity: 0.54
+    intensity_feature: bass_energy
+    bass_feature: bass_energy
+    distortion_feature: treble_energy
+  - type: elemental_field
+    id: plasma_core
+    element: plasma
+    bands: 5
+    density: 54
+    blur: 8
+    opacity: 0.62
+    intensity_feature: treble_energy
+    bass_feature: bass_energy
+    motion_feature: treble_energy
+  - type: spectrum_ring
+    id: storm_ring
+    radius:
+      base: 200
+      feature: rms
+      scale: 85
+    bars:
+      count: 220
+      height_feature: spectrum
+      scale: 210
+    rotation_speed: 0.28
+  - type: elemental_field
+    id: lightning_hits
+    element: lightning
+    bands: 7
+    density: 64
+    blur: 2
+    opacity: 0.72
+    intensity_feature: treble_energy
+    bass_feature: bass_energy
+    motion_feature: treble_energy
+  - type: elemental_field
+    id: fire_floor
+    element: fire
+    bands: 5
+    density: 58
+    blur: 6
+    opacity: 0.72
+    intensity_feature: bass_energy
+    bass_feature: bass_energy
+    motion_feature: treble_energy
+  - type: center_orb
+    id: pressure_orb
+    radius:
+      base: 56
+      feature: bass_energy
+      scale: 120
+  - type: particles
+    id: spark_spray
+    count: 320
+    velocity_feature: treble_energy
+    burst_on: beat

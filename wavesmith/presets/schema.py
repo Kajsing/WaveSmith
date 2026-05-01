@@ -21,7 +21,14 @@ class PresetModule(BaseModel):
 
     model_config = ConfigDict(extra="allow")
 
-    type: Literal["center_orb", "spectrum_ring", "waveform_ribbon", "particles", "shader_field"]
+    type: Literal[
+        "center_orb",
+        "spectrum_ring",
+        "waveform_ribbon",
+        "particles",
+        "shader_field",
+        "elemental_field",
+    ]
     id: str = Field(min_length=1)
 
 

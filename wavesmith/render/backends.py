@@ -13,6 +13,7 @@ from wavesmith.timeline.model import Timeline
 from wavesmith.visuals.background import draw_reactive_background
 from wavesmith.visuals.base import FrameContext
 from wavesmith.visuals.center_orb import draw_center_orb
+from wavesmith.visuals.elemental_field import draw_elemental_field
 from wavesmith.visuals.particles import draw_particles
 from wavesmith.visuals.shader_field import draw_shader_field
 from wavesmith.visuals.spectrum_ring import draw_spectrum_ring
@@ -133,3 +134,5 @@ def _draw_module(ctx: FrameContext, module: PresetModule) -> None:
         draw_particles(ctx, module)
     elif module.type == "shader_field":
         draw_shader_field(ctx, module)
+    elif module.type == "elemental_field":
+        draw_elemental_field(ctx, module)

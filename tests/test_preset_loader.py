@@ -5,6 +5,7 @@ from wavesmith.presets.loader import PresetError, list_builtin_presets, load_pre
 
 def test_builtin_presets_are_available() -> None:
     assert list_builtin_presets() == [
+        "elemental_storm",
         "neon_orb",
         "shader_bloom",
         "spectrum_ring",
@@ -20,7 +21,10 @@ def test_load_builtin_preset_by_name() -> None:
     assert preset.palette.base == (180, 80, 255)
 
 
-@pytest.mark.parametrize("name", ["neon_orb", "shader_bloom", "spectrum_ring", "waveform_ribbon"])
+@pytest.mark.parametrize(
+    "name",
+    ["elemental_storm", "neon_orb", "shader_bloom", "spectrum_ring", "waveform_ribbon"],
+)
 def test_all_builtin_presets_validate(name: str) -> None:
     preset = load_preset(name)
 
@@ -84,3 +88,10 @@ def test_shader_field_module_is_valid() -> None:
 
     assert preset.modules[0].type == "shader_field"
     assert preset.modules[0].model_extra["style"] == "aurora"
+
+
+def test_elemental_field_module_is_valid() -> None:
+    preset = load_preset("elemental_storm")
+
+    assert preset.modules[0].type == "elemental_field"
+    assert preset.modules[0].model_extra["element"] == "water"

@@ -29,13 +29,18 @@ def generate_preset_dict(prompt: str, *, name: str = "custom_prompt") -> dict[st
         },
         "modules": [
             {
-                "type": "shader_field",
+                "type": "elemental_field" if _wants_element(normalized) else "shader_field",
                 "id": "prompt_field",
-                "style": shader_style,
+                **_field_config(normalized, shader_style),
+            },
+            {
+                "type": "shader_field",
+                "id": "prompt_depth",
+                "style": "vortex",
                 "layers": 5,
                 "density": 46,
-                "blur": 8,
-                "opacity": 0.62,
+                "blur": 5,
+                "opacity": 0.42,
                 "intensity_feature": "rms",
                 "bass_feature": "bass_energy",
                 "distortion_feature": "treble_energy",
@@ -66,6 +71,20 @@ def generate_preset_dict(prompt: str, *, name: str = "custom_prompt") -> dict[st
 
 
 def _palette(prompt: str) -> dict[str, object]:
+    if any(word in prompt for word in ["fire", "flame", "burn", "heat"]):
+        return {
+            "mode": "reactive",
+            "base": [34, 214, 255],
+            "accent": [255, 76, 64],
+            "beat": [255, 246, 210],
+        }
+    if any(word in prompt for word in ["water", "ocean", "liquid", "wave"]):
+        return {
+            "mode": "reactive",
+            "base": [20, 160, 255],
+            "accent": [72, 255, 190],
+            "beat": [230, 255, 255],
+        }
     if any(word in prompt for word in ["dark", "cyber", "neon", "night"]):
         return {
             "mode": "reactive",
@@ -100,3 +119,42 @@ def _safe_name(value: str) -> str:
     while "__" in cleaned:
         cleaned = cleaned.replace("__", "_")
     return cleaned or "custom_prompt"
+
+
+def _wants_element(prompt: str) -> bool:
+    return any(
+        word in prompt
+        for word in ["fire", "flame", "burn", "heat", "water", "ocean", "liquid", "ice", "plasma"]
+    )
+
+
+def _field_config(prompt: str, shader_style: str) -> dict[str, object]:
+    if _wants_element(prompt):
+        if any(word in prompt for word in ["fire", "flame", "burn", "heat"]):
+            element = "fire"
+        elif any(word in prompt for word in ["water", "ocean", "liquid", "wave"]):
+            element = "water"
+        elif "ice" in prompt:
+            element = "ice"
+        else:
+            element = "plasma"
+        return {
+            "element": element,
+            "bands": 5,
+            "density": 58,
+            "blur": 7,
+            "opacity": 0.62,
+            "intensity_feature": "rms",
+            "bass_feature": "bass_energy",
+            "motion_feature": "treble_energy",
+        }
+    return {
+        "style": shader_style,
+        "layers": 5,
+        "density": 46,
+        "blur": 8,
+        "opacity": 0.62,
+        "intensity_feature": "rms",
+        "bass_feature": "bass_energy",
+        "distortion_feature": "treble_energy",
+    }

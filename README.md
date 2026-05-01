@@ -45,6 +45,12 @@ For richer shader-style visuals, try:
 wavesmith render song.mp3 shader-preview.mp4 --preset shader_bloom --resolution 640x360 --fps 15 --max-seconds 20
 ```
 
+For a more dramatic elemental look with fire, water, plasma, and heavier motion:
+
+```bash
+wavesmith render song.mp3 storm-preview.mp4 --preset elemental_storm --resolution 640x360 --fps 15 --max-seconds 20
+```
+
 ## Lyrics
 
 WaveSmith can burn timed `.lrc` or `.srt` lyrics into a render:

@@ -31,6 +31,7 @@ WaveSmith can:
 The following future-facing slices have been pulled into the project after MVP:
 
 - Shader-style visual language through `shader_bloom`, `shader_field`, orb glow, and rotating rings.
+- Elemental visuals through `elemental_storm` and fire, water, ice, and plasma fields.
 - Timed `.lrc` and `.srt` lyric display with offset support.
 - Local lyric-to-art-brief JSON generation.
 - Local prompt-to-preset YAML generation with schema validation.

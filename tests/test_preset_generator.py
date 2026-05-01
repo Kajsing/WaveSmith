@@ -10,3 +10,13 @@ def test_generate_preset_dict_returns_valid_schema() -> None:
     assert validated.name == "dark_cyber"
     assert validated.modules[0].type == "shader_field"
     assert validated.palette.base == (62, 255, 188)
+
+
+def test_generate_preset_dict_uses_elemental_field_for_fire_prompt() -> None:
+    preset = generate_preset_dict("fire water plasma storm", name="Elements")
+
+    validated = PresetConfig.model_validate(preset)
+
+    assert validated.name == "elements"
+    assert validated.modules[0].type == "elemental_field"
+    assert validated.modules[0].model_extra["element"] == "fire"
