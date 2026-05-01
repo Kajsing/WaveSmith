@@ -103,3 +103,18 @@ python -m pytest
 ```
 
 Done when batch render produces expected outputs and summary.
+
+## Future - GPU/Shader Render Backend
+
+Keep the CPU/Pillow renderer as the default and fallback, then add a GPU-backed renderer as a later
+version when the MVP has been validated with real music.
+
+Recommended sequence:
+
+1. Define a `RenderBackend` interface.
+2. Move the current Pillow renderer behind a CPU backend implementation.
+3. Add a ModernGL or shader backend behind the same interface.
+4. Start with one GPU visual path, likely orb/ring rendering.
+5. Compare output quality and render speed against the CPU backend.
+
+Done when GPU rendering can be selected explicitly while CPU rendering still works unchanged.

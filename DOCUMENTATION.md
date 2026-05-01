@@ -417,3 +417,17 @@ test -s .tmp/m6-batch-out/batch-summary.json
   thumbnail selection without changing the local-first rule.
 - Batch summary is JSON, which gives us a better foundation for future progress reporting and
   resumable batches.
+
+## 2026-05-01 - Future GPU Render Note
+
+### Changed
+
+- Added a future GPU/shader backend note to `PLAN.md`.
+- Clarified the CPU-renderer decision: CPU remains the reference implementation and fallback, while
+  GPU rendering should arrive later behind a backend interface.
+
+### Notes
+
+- GPU rendering is not part of the current MVP.
+- Recommended future sequence: backend interface, CPU backend wrapper, GPU backend prototype, then
+  quality/performance comparison.
