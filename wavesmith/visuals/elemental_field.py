@@ -6,7 +6,7 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFilter
 
 from wavesmith.presets.schema import PresetModule
-from wavesmith.visuals.base import FrameContext, blend_color, feature_float
+from wavesmith.visuals.base import FrameContext, blend_color, feature_float, feature_vector
 
 
 def draw_elemental_field(ctx: FrameContext, module: PresetModule | None = None) -> None:
@@ -54,7 +54,21 @@ def draw_elemental_field(ctx: FrameContext, module: PresetModule | None = None) 
     elif element == "water":
         _draw_water(ctx, draw, palette, bands, density, opacity, intensity, bass, treble, beat)
     elif element == "ice":
-        _draw_ice(ctx, draw, palette, bands, density, opacity, intensity, bass, treble, beat)
+        _draw_ice(
+            ctx,
+            overlay,
+            draw,
+            palette,
+            bands,
+            density,
+            opacity,
+            intensity,
+            bass,
+            treble,
+            beat,
+            behavior.lower(),
+            line_texture.lower(),
+        )
     elif element == "lightning":
         _draw_lightning(ctx, draw, palette, bands, density, opacity, intensity, bass, treble, beat)
     else:
@@ -808,6 +822,7 @@ def _draw_water(
 
 def _draw_ice(
     ctx: FrameContext,
+    overlay: Image.Image,
     draw: ImageDraw.ImageDraw,
     palette: tuple[tuple[int, int, int], tuple[int, int, int], tuple[int, int, int]],
     bands: int,
@@ -817,7 +832,25 @@ def _draw_ice(
     bass: float,
     treble: float,
     beat: float,
+    behavior: str,
+    line_texture: str,
 ) -> None:
+    if behavior in {"cracked_sheet", "glacial_shards", "sheet", "cracks"}:
+        _draw_cracked_ice_sheet(
+            ctx,
+            overlay,
+            palette,
+            bands,
+            density,
+            opacity,
+            intensity,
+            bass,
+            treble,
+            beat,
+            line_texture,
+        )
+        return
+
     center_x = ctx.width / 2
     center_y = ctx.height / 2
     radius = min(ctx.width, ctx.height) * (0.24 + bass * 0.11 + beat * 0.06)
@@ -843,6 +876,245 @@ def _draw_ice(
             index,
         )
         draw.line((*start, *end), fill=color, width=max(1, ctx.height // 110))
+
+
+def _draw_cracked_ice_sheet(
+    ctx: FrameContext,
+    overlay: Image.Image,
+    palette: tuple[tuple[int, int, int], tuple[int, int, int], tuple[int, int, int]],
+    bands: int,
+    density: int,
+    opacity: float,
+    intensity: float,
+    bass: float,
+    treble: float,
+    beat: float,
+    line_texture: str,
+) -> None:
+    _draw_ice_sheet_surface(ctx, overlay, palette, opacity, intensity, bass, beat)
+    glow = Image.new("RGBA", (ctx.width, ctx.height), (0, 0, 0, 0))
+    glow_draw = ImageDraw.Draw(glow)
+    sharp = Image.new("RGBA", (ctx.width, ctx.height), (0, 0, 0, 0))
+    sharp_draw = ImageDraw.Draw(sharp)
+    _draw_ice_cracks(
+        ctx, glow_draw, sharp_draw, opacity, intensity, bass, treble, beat, line_texture
+    )
+    _draw_glacial_shards(
+        ctx,
+        glow_draw,
+        sharp_draw,
+        palette,
+        bands,
+        density,
+        opacity,
+        intensity,
+        bass,
+        treble,
+        beat,
+    )
+    overlay.alpha_composite(glow.filter(ImageFilter.GaussianBlur(radius=max(3, ctx.height // 52))))
+    overlay.alpha_composite(sharp)
+
+
+def _draw_ice_sheet_surface(
+    ctx: FrameContext,
+    overlay: Image.Image,
+    palette: tuple[tuple[int, int, int], tuple[int, int, int], tuple[int, int, int]],
+    opacity: float,
+    intensity: float,
+    bass: float,
+    beat: float,
+) -> None:
+    field_width = max(120, min(320, ctx.width // 2))
+    field_height = max(80, min(190, ctx.height // 2))
+    x = np.linspace(0.0, 1.0, field_width, dtype=np.float32)
+    y = np.linspace(0.0, 1.0, field_height, dtype=np.float32)
+    xx, yy = np.meshgrid(x, y)
+    time = np.float32(ctx.time_seconds)
+    plane = _smoothstep(0.28, 1.0, yy)
+    perspective = np.clip((yy - 0.28) / 0.72, 0.0, 1.0)
+    texture = _fbm(xx * 7.0 + time * 0.018, yy * 5.0 - time * 0.012, octaves=5)
+    frost = _fbm(xx * 22.0 - time * 0.04, yy * 16.0 + time * 0.02, octaves=3)
+    heat = np.clip(texture * 0.58 + frost * 0.34 + perspective * 0.16 + bass * 0.08, 0, 1)
+    dark = np.array([4, 18, 30], dtype=np.float32)
+    blue = np.array([24, 105, 150], dtype=np.float32)
+    ice = np.array([150, 235, 255], dtype=np.float32)
+    color = _mix_rgb(dark, blue, _smoothstep(0.18, 0.72, heat))
+    color = _mix_rgb(color, ice, _smoothstep(0.72, 1.0, heat + beat * 0.08))
+    alpha = plane * 255 * opacity * (0.46 + intensity * 0.12)
+    rgba = np.dstack((color, np.clip(alpha, 0, 220))).astype(np.uint8)
+    image = Image.fromarray(rgba, mode="RGBA").resize(
+        (ctx.width, ctx.height),
+        Image.Resampling.BICUBIC,
+    )
+    horizon = Image.new("RGBA", (ctx.width, ctx.height), (0, 0, 0, 0))
+    horizon_draw = ImageDraw.Draw(horizon)
+    horizon_y = _ice_horizon_y(ctx)
+    horizon_draw.line(
+        (0, horizon_y, ctx.width, horizon_y + ctx.height * 0.04),
+        fill=(*palette[2], int(255 * opacity * (0.08 + intensity * 0.18 + beat * 0.08))),
+        width=max(2, ctx.height // 80),
+    )
+    overlay.alpha_composite(image)
+    overlay.alpha_composite(
+        horizon.filter(ImageFilter.GaussianBlur(radius=max(2, ctx.height // 90)))
+    )
+
+
+def _ice_horizon_y(ctx: FrameContext) -> float:
+    return ctx.height * 0.46
+
+
+def _draw_ice_cracks(
+    ctx: FrameContext,
+    glow_draw: ImageDraw.ImageDraw,
+    sharp_draw: ImageDraw.ImageDraw,
+    opacity: float,
+    intensity: float,
+    bass: float,
+    treble: float,
+    beat: float,
+    line_texture: str,
+) -> None:
+    crack_count = 12
+    for index in range(crack_count):
+        seed = index + 1.0
+        points = _ice_crack_points(ctx, seed)
+        crack_alpha = int(255 * opacity * (0.2 + bass * 0.28 + intensity * 0.18 + beat * 0.18))
+        glow_color = (72, 220, 255)
+        core_color = (214, 250, 255)
+        width = max(1, int(ctx.height * (0.004 + bass * 0.005)))
+        _draw_textured_polyline(
+            glow_draw,
+            points,
+            glow_color,
+            max(0, min(170, crack_alpha)),
+            width * 5,
+            line_texture,
+            seed * 37.0,
+            ctx.time_seconds * (0.45 + treble * 0.8),
+            soft=True,
+        )
+        _draw_textured_polyline(
+            sharp_draw,
+            points,
+            core_color,
+            max(0, min(230, crack_alpha + 32)),
+            width,
+            line_texture,
+            seed * 53.0,
+            ctx.time_seconds * (0.35 + treble * 0.65),
+        )
+        if index % 2 == 0:
+            _draw_ice_crack_branches(
+                ctx,
+                sharp_draw,
+                points,
+                core_color,
+                crack_alpha,
+                line_texture,
+                seed,
+            )
+
+
+def _ice_crack_points(ctx: FrameContext, seed: float) -> list[tuple[float, float]]:
+    start_x = _hash_scalar(seed, 2.0) * ctx.width
+    start_y = _ice_horizon_y(ctx) + ctx.height * (0.1 + _hash_scalar(seed, 3.0) * 0.44)
+    direction = -1.0 if _hash_scalar(seed, 4.0) < 0.5 else 1.0
+    angle = direction * math.pi * (0.03 + _hash_scalar(seed, 4.5) * 0.18)
+    length = ctx.width * (0.22 + _hash_scalar(seed, 5.0) * 0.5)
+    points: list[tuple[float, float]] = []
+    steps = 9 + int(_hash_scalar(seed, 6.0) * 7)
+    for step in range(steps):
+        amount = step / max(1, steps - 1)
+        jitter = (_hash_scalar(seed + step, 7.0) - 0.5) * ctx.height * 0.045
+        drift = math.sin(step * 1.7 + seed) * ctx.height * 0.018
+        x = start_x + math.cos(angle) * length * amount
+        y = start_y + math.sin(angle) * length * amount * 0.22 + jitter + drift
+        y = _clamp(y, _ice_horizon_y(ctx) + ctx.height * 0.03, ctx.height * 1.02)
+        points.append((x, y))
+    return points
+
+
+def _draw_ice_crack_branches(
+    ctx: FrameContext,
+    draw: ImageDraw.ImageDraw,
+    points: list[tuple[float, float]],
+    color: tuple[int, int, int],
+    alpha: int,
+    line_texture: str,
+    seed: float,
+) -> None:
+    for branch in range(2):
+        anchor_index = min(len(points) - 2, 2 + int(_hash_scalar(seed, branch + 8.0) * 5))
+        anchor = points[anchor_index]
+        direction = -1.0 if branch == 0 else 1.0
+        branch_points = [anchor]
+        for step in range(1, 5):
+            length = ctx.width * (0.018 + step * 0.014)
+            x = anchor[0] + direction * length + (_hash_scalar(seed + step, branch) - 0.5) * 16
+            y = anchor[1] + step * ctx.height * (0.012 + _hash_scalar(seed, step) * 0.008)
+            branch_points.append((x, y))
+        _draw_textured_polyline(
+            draw,
+            branch_points,
+            color,
+            max(0, min(150, alpha - 24)),
+            max(1, ctx.height // 180),
+            line_texture,
+            seed * 71.0 + branch,
+            0.0,
+        )
+
+
+def _draw_glacial_shards(
+    ctx: FrameContext,
+    glow_draw: ImageDraw.ImageDraw,
+    sharp_draw: ImageDraw.ImageDraw,
+    palette: tuple[tuple[int, int, int], tuple[int, int, int], tuple[int, int, int]],
+    bands: int,
+    density: int,
+    opacity: float,
+    intensity: float,
+    bass: float,
+    treble: float,
+    beat: float,
+) -> None:
+    spectrum = feature_vector(ctx.features, "spectrum")
+    shard_count = max(24, min(54, density))
+    horizon_y = _ice_horizon_y(ctx)
+    for index in range(shard_count):
+        seed = index + 12.0
+        x_amount = (index + _hash_scalar(seed, 1.0) * 0.6) / max(1, shard_count - 1)
+        spectrum_value = spectrum[index % len(spectrum)] if spectrum else intensity
+        seed = index + 12.0
+        depth = _hash_scalar(seed, 5.0)
+        perspective = 0.28 + depth * 0.72
+        x = x_amount * ctx.width + math.sin(seed * 1.9) * ctx.width * 0.012
+        base_y = horizon_y + ctx.height * (0.07 + perspective * 0.44)
+        height = ctx.height * (0.028 + spectrum_value * 0.14 + bass * 0.035 + beat * 0.02)
+        height *= (0.45 + _hash_scalar(seed, 2.0) * 0.85) * (0.65 + perspective * 0.7)
+        width = ctx.width * (0.005 + perspective * 0.015 + _hash_scalar(seed, 3.0) * 0.007)
+        lean = (_hash_scalar(seed, 4.0) - 0.5) * width * 1.7
+        tip = (x + lean, base_y - height)
+        left = (x - width, base_y)
+        right = (x + width * 0.72, base_y + height * 0.04)
+        fill = blend_color((22, 130, 180), palette[2], 0.45 + treble * 0.22)
+        alpha = int(
+            255
+            * opacity
+            * (0.08 + spectrum_value * 0.18 + intensity * 0.12)
+            * (0.45 + perspective * 0.55)
+        )
+        glow_draw.polygon((left, tip, right), fill=(*fill, max(0, min(90, alpha))))
+        sharp_draw.polygon((left, tip, right), fill=(*fill, max(0, min(145, alpha))))
+        glint_alpha = int(255 * opacity * (0.12 + treble * 0.24 + beat * 0.12))
+        if index % max(2, bands) == 0:
+            sharp_draw.line(
+                (x, base_y, tip[0], tip[1]),
+                fill=(*palette[2], max(0, min(220, glint_alpha))),
+                width=max(1, int(width * 0.18)),
+            )
 
 
 def _draw_plasma(

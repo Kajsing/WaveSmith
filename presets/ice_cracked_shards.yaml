@@ -1,0 +1,33 @@
+name: ice_cracked_shards
+version: 1
+description: Cracked ice sheet with audio-reactive glacial spectrum shards.
+
+canvas:
+  background: radial_void
+  glow: true
+
+palette:
+  mode: reactive
+  base: [45, 170, 255]
+  accent: [145, 238, 255]
+  beat: [232, 252, 255]
+
+watermark:
+  enabled: true
+  text: "Christian Kajsing // kajsing.com"
+  position: bottom_right
+  opacity: 0.5
+
+modules:
+  - type: elemental_field
+    id: cracked_ice
+    element: ice
+    behavior: cracked_sheet
+    line_texture: grain
+    density: 72
+    bands: 6
+    blur: 4
+    opacity: 0.78
+    intensity_feature: slow_pulse
+    bass_feature: bass_energy
+    motion_feature: treble_energy
