@@ -13,10 +13,14 @@ from wavesmith.timeline.model import Timeline
 from wavesmith.visuals.background import draw_reactive_background
 from wavesmith.visuals.base import FrameContext
 from wavesmith.visuals.center_orb import draw_center_orb
+from wavesmith.visuals.cinematic_backdrop import draw_cinematic_backdrop
 from wavesmith.visuals.elemental_field import draw_elemental_field
+from wavesmith.visuals.image_backdrop import draw_image_backdrop
 from wavesmith.visuals.particles import draw_particles
+from wavesmith.visuals.portal_ring import draw_portal_ring
 from wavesmith.visuals.shader_field import draw_shader_field
 from wavesmith.visuals.spectrum_ring import draw_spectrum_ring
+from wavesmith.visuals.spectrum_wall import draw_spectrum_wall
 from wavesmith.visuals.text import draw_lyrics, draw_watermark
 from wavesmith.visuals.waveform_ribbon import draw_waveform_ribbon
 
@@ -136,3 +140,11 @@ def _draw_module(ctx: FrameContext, module: PresetModule) -> None:
         draw_shader_field(ctx, module)
     elif module.type == "elemental_field":
         draw_elemental_field(ctx, module)
+    elif module.type == "portal_ring":
+        draw_portal_ring(ctx, module)
+    elif module.type == "spectrum_wall":
+        draw_spectrum_wall(ctx, module)
+    elif module.type == "cinematic_backdrop":
+        draw_cinematic_backdrop(ctx, module)
+    elif module.type == "image_backdrop":
+        draw_image_backdrop(ctx, module)

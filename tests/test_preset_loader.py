@@ -6,6 +6,7 @@ from wavesmith.presets.loader import PresetError, list_builtin_presets, load_pre
 def test_builtin_presets_are_available() -> None:
     assert list_builtin_presets() == [
         "elemental_storm",
+        "inferno_portal",
         "neon_orb",
         "shader_bloom",
         "spectrum_ring",
@@ -23,7 +24,14 @@ def test_load_builtin_preset_by_name() -> None:
 
 @pytest.mark.parametrize(
     "name",
-    ["elemental_storm", "neon_orb", "shader_bloom", "spectrum_ring", "waveform_ribbon"],
+    [
+        "elemental_storm",
+        "inferno_portal",
+        "neon_orb",
+        "shader_bloom",
+        "spectrum_ring",
+        "waveform_ribbon",
+    ],
 )
 def test_all_builtin_presets_validate(name: str) -> None:
     preset = load_preset(name)
@@ -95,3 +103,37 @@ def test_elemental_field_module_is_valid() -> None:
 
     assert preset.modules[0].type == "elemental_field"
     assert preset.modules[0].model_extra["element"] == "water"
+
+
+def test_cinematic_modules_are_valid() -> None:
+    preset = load_preset("inferno_portal")
+
+    module_types = {module.type for module in preset.modules}
+    assert "portal_ring" in module_types
+    assert "spectrum_wall" in module_types
+
+
+def test_image_backdrop_module_type_is_valid(tmp_path) -> None:
+    preset_file = tmp_path / "image.yaml"
+    preset_file.write_text(
+        """
+name: image
+version: 1
+description: Image backdrop preset.
+canvas:
+  background: black
+palette:
+  base: [1, 2, 3]
+  accent: [4, 5, 6]
+  beat: [7, 8, 9]
+modules:
+  - type: image_backdrop
+    id: image
+    path: /tmp/example.png
+""",
+        encoding="utf-8",
+    )
+
+    preset = load_preset(preset_file)
+
+    assert preset.modules[0].type == "image_backdrop"

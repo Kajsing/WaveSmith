@@ -51,6 +51,16 @@ For a more dramatic elemental look with fire, water, plasma, and heavier motion:
 wavesmith render song.mp3 storm-preview.mp4 --preset elemental_storm --resolution 640x360 --fps 15 --max-seconds 20
 ```
 
+For a cinematic portal/waveform look inspired by fire visualizer posters:
+
+```bash
+wavesmith render song.mp3 inferno-preview.mp4 --preset inferno_portal --resolution 640x360 --fps 15 --max-seconds 20
+```
+
+Advanced presets can also use a local image as a cinematic backdrop with the `image_backdrop`
+module. This keeps the workflow local while allowing generated or hand-made style frames to drive
+the look.
+
 ## Lyrics
 
 WaveSmith can burn timed `.lrc` or `.srt` lyrics into a render:

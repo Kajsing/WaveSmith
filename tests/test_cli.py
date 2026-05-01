@@ -20,6 +20,7 @@ def test_list_presets_shows_builtins() -> None:
 
     assert result.exit_code == 0
     assert "elemental_storm" in result.output
+    assert "inferno_portal" in result.output
     assert "neon_orb" in result.output
     assert "shader_bloom" in result.output
     assert "spectrum_ring" in result.output

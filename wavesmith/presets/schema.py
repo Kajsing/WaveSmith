@@ -28,6 +28,10 @@ class PresetModule(BaseModel):
         "particles",
         "shader_field",
         "elemental_field",
+        "portal_ring",
+        "spectrum_wall",
+        "cinematic_backdrop",
+        "image_backdrop",
     ]
     id: str = Field(min_length=1)
 

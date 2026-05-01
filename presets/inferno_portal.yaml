@@ -1,0 +1,77 @@
+name: inferno_portal
+version: 1
+description: Cinematic fire portal with waveform beam, spectrum spires, sparks, and heat motion.
+
+canvas:
+  background: radial_void
+  glow: true
+
+palette:
+  mode: reactive
+  base: [180, 28, 8]
+  accent: [255, 78, 16]
+  beat: [255, 238, 150]
+
+watermark:
+  enabled: true
+  text: "Christian Kajsing // kajsing.com"
+  position: bottom_right
+  opacity: 0.48
+
+modules:
+  - type: cinematic_backdrop
+    id: black_fire_stage
+    darkness: 0.94
+    haze: 0.32
+  - type: shader_field
+    id: heat_smoke
+    style: aurora
+    layers: 4
+    density: 50
+    blur: 14
+    opacity: 0.44
+    intensity_feature: rms
+    bass_feature: bass_energy
+    distortion_feature: treble_energy
+  - type: spectrum_wall
+    id: fire_spires
+    bars: 170
+    height: 0.44
+    baseline: 0.54
+    layout: sides
+    opacity: 0.9
+    spectrum_feature: spectrum
+    waveform_feature: waveform_preview
+  - type: portal_ring
+    id: fire_portal
+    style: inferno
+    radius: 0.3
+    center_y: 0.49
+    width: 0.052
+    shards: 260
+    opacity: 0.95
+  - type: elemental_field
+    id: fire_lift
+    element: fire
+    bands: 8
+    density: 78
+    blur: 7
+    opacity: 0.72
+    intensity_feature: bass_energy
+    bass_feature: bass_energy
+    motion_feature: treble_energy
+  - type: elemental_field
+    id: ember_lightning
+    element: lightning
+    bands: 6
+    density: 58
+    blur: 2
+    opacity: 0.42
+    intensity_feature: treble_energy
+    bass_feature: bass_energy
+    motion_feature: treble_energy
+  - type: particles
+    id: ember_sparks
+    count: 150
+    velocity_feature: treble_energy
+    burst_on: beat
