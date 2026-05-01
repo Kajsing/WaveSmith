@@ -23,6 +23,9 @@ class RenderOptions:
     crf: int
     ffmpeg_preset: str
     force_analysis: bool = False
+    thumbnail: bool = False
+    thumbnail_at: str = "50%"
+    thumbnail_path: Path | None = None
 
 
 def parse_resolution(value: str) -> tuple[int, int]:
@@ -58,6 +61,9 @@ def build_render_options(
     crf: int,
     ffmpeg_preset: str,
     force_analysis: bool,
+    thumbnail: bool = False,
+    thumbnail_at: str = "50%",
+    thumbnail_path: Path | None = None,
 ) -> RenderOptions:
     """Validate CLI render values and return normalized options."""
     if not input_audio.exists():
@@ -85,4 +91,7 @@ def build_render_options(
         crf=crf,
         ffmpeg_preset=ffmpeg_preset,
         force_analysis=force_analysis,
+        thumbnail=thumbnail,
+        thumbnail_at=thumbnail_at,
+        thumbnail_path=thumbnail_path,
     )

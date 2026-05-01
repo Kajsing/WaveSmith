@@ -9,8 +9,9 @@ from rich.console import Console
 from wavesmith import __version__
 from wavesmith.audio.analyzer import DEFAULT_FEATURE_FPS, AudioAnalysisError, analyze_audio
 from wavesmith.presets.loader import PresetError, list_builtin_presets, load_preset
+from wavesmith.render.batch import run_batch
 from wavesmith.render.ffmpeg import FfmpegMissingError, FfmpegRenderError
-from wavesmith.render.options import RenderOptionsError, build_render_options
+from wavesmith.render.options import RenderOptionsError, build_render_options, parse_resolution
 from wavesmith.render.pipeline import render_video
 
 app = typer.Typer(
@@ -95,6 +96,14 @@ def render(
         bool,
         typer.Option("--force-analysis", help="Bypass any future analysis cache."),
     ] = False,
+    thumbnail: Annotated[
+        bool,
+        typer.Option("--thumbnail", help="Extract a local JPG thumbnail after rendering."),
+    ] = False,
+    thumbnail_at: Annotated[
+        str,
+        typer.Option("--thumbnail-at", help="Thumbnail time in seconds or percent, e.g. 50%."),
+    ] = "50%",
 ) -> None:
     """Render one audio file to one MP4 video."""
     try:
@@ -109,6 +118,8 @@ def render(
             crf=crf,
             ffmpeg_preset=ffmpeg_preset,
             force_analysis=force_analysis,
+            thumbnail=thumbnail,
+            thumbnail_at=thumbnail_at,
         )
         result = render_video(options)
     except RenderOptionsError as exc:
@@ -130,6 +141,8 @@ def render(
     console.print(f"[green]Rendered:[/green] {output_video} ({result.duration_seconds:.2f}s)")
     console.print(f"analysis_cache={result.cache_status} cache={_compact_path(result.cache_path)}")
     console.print(f"render_log={_compact_path(result.log_path, keep=26)}")
+    if result.thumbnail_path:
+        console.print(f"thumbnail={_compact_path(result.thumbnail_path, keep=26)}")
 
 
 @app.command()
@@ -171,12 +184,69 @@ def batch(
         typer.Option("--resolution", help="Output resolution."),
     ] = "1920x1080",
     fps: Annotated[int, typer.Option("--fps", min=1, help="Frames per second.")] = 30,
+    max_seconds: Annotated[
+        float | None,
+        typer.Option("--max-seconds", min=0.1, help="Optional render duration limit."),
+    ] = None,
+    watermark: Annotated[str | None, typer.Option("--watermark", help="Watermark text.")] = None,
+    crf: Annotated[
+        int,
+        typer.Option("--crf", min=0, max=51, help="ffmpeg CRF quality value."),
+    ] = 18,
+    ffmpeg_preset: Annotated[
+        str,
+        typer.Option("--ffmpeg-preset", help="ffmpeg encoder preset."),
+    ] = "medium",
+    force_analysis: Annotated[
+        bool,
+        typer.Option("--force-analysis", help="Bypass analysis cache for every item."),
+    ] = False,
+    thumbnails: Annotated[
+        bool,
+        typer.Option(
+            "--thumbnails/--no-thumbnails",
+            help="Extract JPG thumbnails for batch items.",
+        ),
+    ] = True,
+    thumbnail_at: Annotated[
+        str,
+        typer.Option("--thumbnail-at", help="Thumbnail time in seconds or percent, e.g. 50%."),
+    ] = "50%",
+    stop_on_error: Annotated[
+        bool,
+        typer.Option("--stop-on-error", help="Stop batch rendering after the first failure."),
+    ] = False,
 ) -> None:
-    """Placeholder for batch rendering."""
+    """Render supported audio files from a folder."""
+    try:
+        load_preset(preset)
+        width, height = parse_resolution(resolution)
+        summary = run_batch(
+            input_dir=input_dir,
+            output_dir=output_dir,
+            preset=preset,
+            width=width,
+            height=height,
+            fps=fps,
+            max_seconds=max_seconds,
+            watermark=watermark,
+            crf=crf,
+            ffmpeg_preset=ffmpeg_preset,
+            force_analysis=force_analysis,
+            thumbnails=thumbnails,
+            thumbnail_at=thumbnail_at,
+            stop_on_error=stop_on_error,
+        )
+    except (ValueError, RenderOptionsError) as exc:
+        console.print(f"[red]Invalid batch options:[/red] {exc}")
+        raise typer.Exit(2) from exc
+    except PresetError as exc:
+        console.print(f"[red]Preset error:[/red] {exc}")
+        raise typer.Exit(2) from exc
+
     console.print(
-        "[yellow]Batch rendering is planned for M6 and is not implemented in M0.[/yellow]"
+        f"[green]Batch complete:[/green] {summary.succeeded} succeeded, {summary.failed} failed"
     )
-    console.print(f"input_dir={input_dir}")
-    console.print(f"output_dir={output_dir}")
-    console.print(f"preset={preset}, resolution={resolution}, fps={fps}")
-    raise typer.Exit(1)
+    console.print(f"summary={_compact_path(Path(summary.summary_path), keep=26)}")
+    if summary.failed:
+        raise typer.Exit(4)

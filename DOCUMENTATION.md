@@ -364,3 +364,56 @@ find .renders/logs -maxdepth 1 -type f | wc -l
 - Passed.
 - Unit test suite: 45 tests passed.
 - Render CLI output now shows compact cache/log paths.
+
+## 2026-05-01 - M6 Batch Rendering And Thumbnails
+
+### Changed
+
+- Implemented local thumbnail extraction from rendered MP4 files via ffmpeg.
+- Added single-render thumbnail options:
+  - `--thumbnail`
+  - `--thumbnail-at`, accepting seconds or percentages like `10s` or `50%`
+- Implemented `wavesmith batch INPUT_DIR OUTPUT_DIR`.
+- Batch render processes `.mp3` and `.wav` files in deterministic filename order.
+- Batch render writes one MP4 per source file.
+- Batch render writes JPG thumbnails under `OUTPUT_DIR/thumbnails/` by default.
+- Batch render writes `OUTPUT_DIR/batch-summary.json`.
+- Added `--no-thumbnails` and `--stop-on-error`.
+- Added tests for thumbnail time parsing, local ffmpeg thumbnail extraction, audio discovery, batch
+  summaries, thumbnail paths, and stop-on-error behavior.
+
+### Validation Run
+
+```bash
+.venv/bin/ruff check .
+.venv/bin/python -m pytest
+.venv/bin/python scripts/generate_test_audio.py .tmp/test.wav --seconds 3
+.venv/bin/wavesmith render .tmp/test.wav .tmp/thumb-test.mp4 --preset neon_orb --resolution 640x360 --fps 15 --max-seconds 3 --watermark "" --thumbnail --thumbnail-at 50%
+test -s .renders/thumbnails/thumb-test.jpg
+mkdir -p .tmp/m6-batch-in
+.venv/bin/python scripts/generate_test_audio.py .tmp/m6-batch-in/a.wav --seconds 3
+.venv/bin/python scripts/generate_test_audio.py .tmp/m6-batch-in/b.wav --seconds 3 --frequency 660
+.venv/bin/wavesmith batch .tmp/m6-batch-in .tmp/m6-batch-out --preset spectrum_ring --resolution 640x360 --fps 15 --max-seconds 3
+test -s .tmp/m6-batch-out/a.mp4
+test -s .tmp/m6-batch-out/b.mp4
+test -s .tmp/m6-batch-out/thumbnails/a.jpg
+test -s .tmp/m6-batch-out/thumbnails/b.jpg
+test -s .tmp/m6-batch-out/batch-summary.json
+```
+
+### Result
+
+- Passed.
+- Unit test suite: 52 tests passed.
+- Single render thumbnail extraction succeeded.
+- Batch render completed with 2 successes and 0 failures.
+- Batch summary recorded output videos, thumbnails, cache status, and render log paths.
+
+### Improvement Notes
+
+- Thumbnail generation is intentionally local-only and based on ffmpeg frame extraction from the
+  finished MP4.
+- Future thumbnail work can add poster-frame design, multiple candidate frames, or feature-based
+  thumbnail selection without changing the local-first rule.
+- Batch summary is JSON, which gives us a better foundation for future progress reporting and
+  resumable batches.

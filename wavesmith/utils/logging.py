@@ -27,6 +27,7 @@ def write_render_log(
     cache_status: str | None,
     cache_path: Path | None,
     ffmpeg_command: list[str] | None,
+    thumbnail_path: Path | None = None,
     error: BaseException | None = None,
 ) -> None:
     """Write a plain-text render log."""
@@ -41,6 +42,7 @@ def write_render_log(
         f"fps={fps}",
         f"analysis_cache_status={cache_status}",
         f"analysis_cache_path={cache_path}",
+        f"thumbnail_path={thumbnail_path}",
     ]
     if ffmpeg_command:
         lines.append(f"ffmpeg_command={shlex.join(ffmpeg_command)}")

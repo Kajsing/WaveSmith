@@ -32,6 +32,14 @@ wavesmith render song.mp3 out.mp4 --preset neon_orb --resolution 1920x1080 --fps
 wavesmith render song.mp3 preview.mp4 --preset neon_orb --resolution 640x360 --fps 15 --max-seconds 20
 ```
 
+## Thumbnail
+
+```bash
+wavesmith render song.mp3 preview.mp4 --preset neon_orb --thumbnail --thumbnail-at 50%
+```
+
+Thumbnails are extracted locally from the rendered MP4 with ffmpeg.
+
 ## List Presets
 
 ```bash
@@ -47,8 +55,10 @@ wavesmith validate-preset presets/neon_orb.yaml
 ## Batch Render
 
 ```bash
-wavesmith batch ./songs ./renders --preset spectrum_ring
+wavesmith batch ./songs ./renders --preset spectrum_ring --resolution 640x360 --fps 15
 ```
+
+Batch render writes `batch-summary.json` and thumbnails under the output directory by default.
 
 ## Development Validation
 

@@ -123,6 +123,58 @@ def build_rawvideo_command(
     ]
 
 
+def parse_thumbnail_time(value: str, duration_seconds: float) -> float:
+    """Parse thumbnail time as seconds or percent of duration."""
+    normalized = value.strip().lower()
+    if normalized.endswith("%"):
+        try:
+            percent = float(normalized[:-1])
+        except ValueError as exc:
+            raise FfmpegRenderError("Thumbnail percent must be numeric.") from exc
+        if percent < 0 or percent > 100:
+            raise FfmpegRenderError("Thumbnail percent must be between 0 and 100.")
+        return max(0.0, min(duration_seconds, duration_seconds * percent / 100))
+
+    if normalized.endswith("s"):
+        normalized = normalized[:-1]
+    try:
+        seconds = float(normalized)
+    except ValueError as exc:
+        raise FfmpegRenderError("Thumbnail time must be seconds or a percent like 50%.") from exc
+    if seconds < 0:
+        raise FfmpegRenderError("Thumbnail time must be greater than or equal to 0.")
+    return max(0.0, min(duration_seconds, seconds))
+
+
+def extract_thumbnail(
+    *,
+    input_video: Path,
+    output_image: Path,
+    at: str,
+    duration_seconds: float,
+) -> None:
+    """Extract a local JPG thumbnail from a rendered video."""
+    ffmpeg = require_binary("ffmpeg")
+    output_image.parent.mkdir(parents=True, exist_ok=True)
+    timestamp = parse_thumbnail_time(at, duration_seconds)
+    command = [
+        ffmpeg,
+        "-y",
+        "-ss",
+        f"{timestamp:.3f}",
+        "-i",
+        str(input_video),
+        "-frames:v",
+        "1",
+        "-q:v",
+        "2",
+        str(output_image),
+    ]
+    result = subprocess.run(command, capture_output=True, check=False, text=True)
+    if result.returncode != 0:
+        raise FfmpegRenderError(result.stderr.strip() or "ffmpeg could not extract thumbnail.")
+
+
 def encode_raw_frames(
     *,
     command: list[str],

@@ -13,6 +13,7 @@ from wavesmith.presets.schema import PresetConfig, PresetModule
 from wavesmith.render.ffmpeg import (
     build_rawvideo_command,
     encode_raw_frames,
+    extract_thumbnail,
     probe_duration_seconds,
 )
 from wavesmith.render.options import RenderOptions
@@ -35,6 +36,7 @@ class RenderResult:
     cache_status: str
     cache_path: Path
     log_path: Path
+    thumbnail_path: Path | None = None
 
 
 def render_video(options: RenderOptions) -> RenderResult:
@@ -69,6 +71,14 @@ def render_video(options: RenderOptions) -> RenderResult:
             command=command,
             frames=generate_reactive_frames(options, duration_seconds, timeline, preset),
         )
+        thumbnail_path = _thumbnail_path(options)
+        if thumbnail_path:
+            extract_thumbnail(
+                input_video=options.output_video,
+                output_image=thumbnail_path,
+                at=options.thumbnail_at,
+                duration_seconds=duration_seconds,
+            )
     except Exception as exc:
         write_render_log(
             path=log_path,
@@ -82,6 +92,7 @@ def render_video(options: RenderOptions) -> RenderResult:
             cache_status=cached.cache_status if cached else None,
             cache_path=cached.cache_path if cached else None,
             ffmpeg_command=command,
+            thumbnail_path=_thumbnail_path(options),
             error=exc,
         )
         raise
@@ -98,12 +109,14 @@ def render_video(options: RenderOptions) -> RenderResult:
         cache_status=cached.cache_status,
         cache_path=cached.cache_path,
         ffmpeg_command=command,
+        thumbnail_path=_thumbnail_path(options),
     )
     return RenderResult(
         duration_seconds=duration_seconds,
         cache_status=cached.cache_status,
         cache_path=cached.cache_path,
         log_path=log_path,
+        thumbnail_path=_thumbnail_path(options),
     )
 
 
@@ -191,3 +204,11 @@ def _watermark_text(options: RenderOptions, preset: PresetConfig) -> str | None:
     if preset.watermark and preset.watermark.enabled:
         return preset.watermark.text
     return ""
+
+
+def _thumbnail_path(options: RenderOptions) -> Path | None:
+    if not options.thumbnail:
+        return None
+    if options.thumbnail_path:
+        return options.thumbnail_path
+    return Path(".renders/thumbnails") / f"{options.output_video.stem}.jpg"
