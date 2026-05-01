@@ -13,6 +13,8 @@
 
 ## Environment Setup
 
+Preferred when system Python 3.11+ is available:
+
 ```bash
 sudo apt update
 sudo apt install -y ffmpeg python3-venv python3-pip
@@ -22,14 +24,33 @@ pip install -U pip
 pip install -e .[dev]
 ```
 
+If WSL only has Python 3.10 and sudo is unavailable, use local `uv` Python instead:
+
+```bash
+python3 -m pip install --user uv
+~/.local/bin/uv python install 3.11
+~/.local/bin/uv venv --clear --python 3.11 .venv
+~/.local/bin/uv pip install --python .venv/bin/python -e '.[dev]'
+```
+
 ## Common Validation
 
 ```bash
-ruff check .
-python -m pytest
-wavesmith --help
-wavesmith list-presets
+.venv/bin/ruff check .
+.venv/bin/python -m pytest
+.venv/bin/wavesmith --help
+.venv/bin/wavesmith list-presets
 ```
+
+## GitHub Push From WSL
+
+Prefer SSH for pushes from WSL:
+
+```bash
+git push git@github.com:Kajsing/WaveSmith.git Main
+```
+
+The HTTPS remote may prompt for credentials and block non-interactive Codex runs.
 
 ## Render Smoke Test
 
