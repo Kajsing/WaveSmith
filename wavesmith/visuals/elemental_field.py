@@ -56,7 +56,7 @@ def _draw_fire(
     beat: float,
 ) -> None:
     floor = ctx.height * (0.93 - beat * 0.05)
-    flame_height = ctx.height * (0.34 + bass * 0.22 + beat * 0.16)
+    flame_height = ctx.height * (0.42 + bass * 0.28 + beat * 0.18)
     for band in range(bands):
         points: list[tuple[float, float]] = []
         phase = ctx.time_seconds * (1.4 + treble * 1.8) + band * 0.9
@@ -69,6 +69,78 @@ def _draw_fire(
             points.append((x, y))
         color = _rgba(_blend3(palette, band / max(1, bands - 1)), opacity, intensity, beat, band)
         draw.line(points, fill=color, width=max(3, ctx.height // 55), joint="curve")
+    _draw_fire_lashes(ctx, draw, palette, density, opacity, intensity, bass, treble, beat, floor)
+    _draw_fire_embers(ctx, draw, palette, density, opacity, intensity, treble, beat, floor)
+
+
+def _draw_fire_lashes(
+    ctx: FrameContext,
+    draw: ImageDraw.ImageDraw,
+    palette: tuple[tuple[int, int, int], tuple[int, int, int], tuple[int, int, int]],
+    density: int,
+    opacity: float,
+    intensity: float,
+    bass: float,
+    treble: float,
+    beat: float,
+    floor: float,
+) -> None:
+    lash_count = max(24, min(density, 90))
+    for index in range(lash_count):
+        amount = index / max(1, lash_count - 1)
+        x = amount * ctx.width
+        phase = ctx.time_seconds * (1.6 + treble * 2.0) + index * 0.73
+        base_width = ctx.width * (0.008 + (index % 5) * 0.0015)
+        height = ctx.height * (0.18 + intensity * 0.1 + bass * 0.32 + beat * 0.14)
+        height *= 0.55 + abs(math.sin(index * 1.91 + ctx.time_seconds * 0.9))
+        curl = math.sin(phase) * ctx.width * (0.012 + treble * 0.018)
+        tip_y = floor - height
+        mid_y = floor - height * 0.48
+        color_amount = min(1.0, 0.2 + height / max(1, ctx.height * 0.42))
+        fill = _blend3(palette, color_amount)
+        alpha = int(255 * opacity * (0.28 + intensity * 0.28 + bass * 0.32 + beat * 0.18))
+        points = [
+            (x - base_width * 1.7, floor),
+            (x - base_width * 0.45 + curl * 0.35, mid_y),
+            (x + curl, tip_y),
+            (x + base_width * 0.5 + curl * 0.25, mid_y),
+            (x + base_width * 1.7, floor),
+        ]
+        draw.polygon(points, fill=(*fill, max(0, min(220, alpha))))
+        inner = _blend3(palette, 0.86)
+        draw.line(
+            [(x, floor), (x + curl * 0.42, mid_y), (x + curl, tip_y)],
+            fill=(*inner, max(0, min(255, alpha + 32))),
+            width=max(1, ctx.height // 95),
+            joint="curve",
+        )
+
+
+def _draw_fire_embers(
+    ctx: FrameContext,
+    draw: ImageDraw.ImageDraw,
+    palette: tuple[tuple[int, int, int], tuple[int, int, int], tuple[int, int, int]],
+    density: int,
+    opacity: float,
+    intensity: float,
+    treble: float,
+    beat: float,
+    floor: float,
+) -> None:
+    ember_count = max(28, density // 2)
+    for index in range(ember_count):
+        drift = ctx.time_seconds * (0.18 + treble * 0.5)
+        x = ((index * 89.17 + drift * ctx.width) % (ctx.width * 1.08)) - ctx.width * 0.04
+        rise = ((index * 0.137 + ctx.progress * (0.5 + treble)) % 1.0)
+        y = floor - rise * ctx.height * (0.55 + beat * 0.12)
+        flicker = 0.55 + abs(math.sin(index * 2.1 + ctx.time_seconds * 4.0)) * 0.45
+        size = max(1, int((1 + (index % 3)) * flicker))
+        color = _blend3(palette, 0.62 + (index % 5) / 14)
+        alpha = int(255 * opacity * (0.24 + intensity * 0.2 + treble * 0.26) * flicker)
+        draw.ellipse(
+            (x - size, y - size, x + size, y + size),
+            fill=(*color, max(0, min(255, alpha))),
+        )
 
 
 def _draw_water(
