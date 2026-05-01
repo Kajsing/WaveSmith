@@ -77,10 +77,16 @@ def _draw_fire(
     behavior: str,
     line_texture: str,
 ) -> None:
+    floor = ctx.height * (0.93 - beat * 0.05)
+    if behavior in {"dual_lines", "fire_lines", "line_pair", "rails"}:
+        _draw_dual_fire_lines(
+            ctx, overlay, palette, opacity, intensity, bass, treble, beat, line_texture
+        )
+        return
+
     _draw_fire_density_field(
         ctx, overlay, palette, opacity, intensity, bass, treble, beat, behavior
     )
-    floor = ctx.height * (0.93 - beat * 0.05)
     if behavior in {"natural", "realistic", "normal"}:
         _draw_solar_surface(ctx, overlay, palette, opacity, intensity, bass, beat)
         _draw_solar_prominences(
@@ -109,6 +115,152 @@ def _draw_fire(
     _draw_fire_embers(
         ctx, draw, palette, density, opacity, intensity, treble, beat, floor, behavior
     )
+
+
+def _draw_dual_fire_lines(
+    ctx: FrameContext,
+    overlay: Image.Image,
+    palette: tuple[tuple[int, int, int], tuple[int, int, int], tuple[int, int, int]],
+    opacity: float,
+    intensity: float,
+    bass: float,
+    treble: float,
+    beat: float,
+    line_texture: str,
+) -> None:
+    glow = Image.new("RGBA", (ctx.width, ctx.height), (0, 0, 0, 0))
+    glow_draw = ImageDraw.Draw(glow)
+    sharp = Image.new("RGBA", (ctx.width, ctx.height), (0, 0, 0, 0))
+    sharp_draw = ImageDraw.Draw(sharp)
+    for line_index in range(2):
+        amount = line_index / 1
+        points = _dual_fire_line_points(ctx, line_index)
+        outer = blend_color((255, 58, 18), palette[1], 0.35 + amount * 0.12)
+        middle = blend_color((255, 158, 34), palette[2], 0.22)
+        inner = blend_color((255, 236, 148), palette[2], 0.62)
+        line_alpha = int(255 * opacity * (0.28 + intensity * 0.26 + bass * 0.18 + beat * 0.08))
+        line_width = max(3, int(ctx.height * (0.009 + intensity * 0.006)))
+        _draw_textured_polyline(
+            glow_draw,
+            points,
+            outer,
+            max(0, min(170, line_alpha - 8)),
+            line_width * 7,
+            line_texture,
+            71.0 + line_index * 13.0,
+            ctx.time_seconds * 1.6,
+            soft=True,
+        )
+        _draw_textured_polyline(
+            sharp_draw,
+            points,
+            middle,
+            max(0, min(225, line_alpha + 18)),
+            line_width * 2,
+            line_texture,
+            83.0 + line_index * 17.0,
+            ctx.time_seconds * 1.8,
+        )
+        _draw_textured_polyline(
+            sharp_draw,
+            points,
+            inner,
+            max(0, min(255, line_alpha + 54)),
+            max(1, line_width // 2),
+            line_texture,
+            97.0 + line_index * 19.0,
+            ctx.time_seconds * 2.0,
+        )
+        _draw_dual_line_flames(
+            sharp_draw,
+            points,
+            palette,
+            opacity,
+            intensity,
+            bass,
+            treble,
+            beat,
+            line_index,
+            ctx.height,
+        )
+    overlay.alpha_composite(glow.filter(ImageFilter.GaussianBlur(radius=max(3, ctx.height // 48))))
+    overlay.alpha_composite(sharp)
+
+
+def _dual_fire_line_points(ctx: FrameContext, line_index: int) -> list[tuple[float, float]]:
+    points: list[tuple[float, float]] = []
+    far = (-ctx.width * 0.1, ctx.height * (0.34 + line_index * 0.13))
+    near = (ctx.width * 1.08, ctx.height * (0.59 + line_index * 0.18))
+    for index in range(120):
+        amount = index / 119
+        perspective = amount**1.18
+        x = far[0] + (near[0] - far[0]) * perspective
+        y = far[1] + (near[1] - far[1]) * perspective
+        y += math.sin(amount * math.tau * 1.35 + line_index * 0.9) * ctx.height * 0.008
+        points.append((x, y))
+    return points
+
+
+def _draw_dual_line_flames(
+    draw: ImageDraw.ImageDraw,
+    points: list[tuple[float, float]],
+    palette: tuple[tuple[int, int, int], tuple[int, int, int], tuple[int, int, int]],
+    opacity: float,
+    intensity: float,
+    bass: float,
+    treble: float,
+    beat: float,
+    line_index: int,
+    canvas_height: int,
+) -> None:
+    if len(points) < 3:
+        return
+    for index in range(3, len(points) - 3, 2):
+        amount = index / max(1, len(points) - 1)
+        seed = index * 0.73 + line_index * 19.0
+        flicker = _hash_scalar(math.floor(amount * 180.0 + treble * 18.0), seed)
+        wave = 0.5 + 0.5 * math.sin(seed + amount * math.tau * 10.0 + treble * 3.0)
+        if _hash_scalar(math.floor(amount * 240.0), seed + 41.0) < 0.34 - treble * 0.12:
+            continue
+        height = (0.22 + amount * 0.9) * (0.45 + flicker * 0.8 + wave * 0.22)
+        height *= 0.014 + intensity * 0.03 + bass * 0.016 + beat * 0.01
+        height_px = max(2.0, height * canvas_height)
+        height_px *= 0.72 + amount * 0.75
+        x, y = points[index]
+        prev_x, prev_y = points[index - 2]
+        next_x, next_y = points[index + 2]
+        tangent_x = next_x - prev_x
+        tangent_y = next_y - prev_y
+        tangent_length = max(0.0001, math.hypot(tangent_x, tangent_y))
+        normal_x = -tangent_y / tangent_length
+        normal_y = tangent_x / tangent_length
+        if normal_y > 0:
+            normal_x *= -1
+            normal_y *= -1
+        lean = (flicker - 0.5) * 0.18
+        tip = (
+            x + normal_x * height_px * (0.12 + lean),
+            y + normal_y * height_px,
+        )
+        half_width = max(1.0, (1.0 + amount * 3.8) * (0.65 + flicker * 0.48))
+        base_a = (
+            x - tangent_x / tangent_length * half_width,
+            y - tangent_y / tangent_length * half_width,
+        )
+        base_b = (
+            x + tangent_x / tangent_length * half_width,
+            y + tangent_y / tangent_length * half_width,
+        )
+        flame_alpha = int(255 * opacity * (0.16 + intensity * 0.24 + bass * 0.16) * (0.45 + amount))
+        outer = blend_color((255, 70, 16), palette[1], 0.3)
+        inner = blend_color((255, 218, 112), palette[2], 0.5)
+        draw.polygon((base_a, tip, base_b), fill=(*outer, max(0, min(145, flame_alpha))))
+        if index % 2 == 0:
+            draw.line(
+                (x, y, tip[0], tip[1]),
+                fill=(*inner, max(0, min(220, flame_alpha + 38))),
+                width=max(1, int(half_width * 0.42)),
+            )
 
 
 def _draw_fire_density_field(

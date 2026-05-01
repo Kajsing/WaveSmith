@@ -1,0 +1,33 @@
+name: fire_dual_lines
+version: 1
+description: Two fast perspective fire trails with texture-ready line rendering.
+
+canvas:
+  background: radial_void
+  glow: true
+
+palette:
+  mode: reactive
+  base: [255, 54, 18]
+  accent: [255, 118, 20]
+  beat: [255, 235, 132]
+
+watermark:
+  enabled: true
+  text: "Christian Kajsing // kajsing.com"
+  position: bottom_right
+  opacity: 0.5
+
+modules:
+  - type: elemental_field
+    id: dual_fire_lines
+    element: fire
+    behavior: dual_lines
+    line_texture: plasma
+    density: 72
+    bands: 2
+    blur: 3
+    opacity: 0.88
+    intensity_feature: rms
+    bass_feature: bass_energy
+    motion_feature: treble_energy

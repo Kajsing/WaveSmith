@@ -121,6 +121,43 @@ def test_draw_natural_fire_accepts_line_texture() -> None:
     assert ImageChops.difference(before, image).getbbox() is not None
 
 
+def test_draw_dual_fire_lines_behavior_changes_image() -> None:
+    image = Image.new("RGB", (160, 90), (0, 0, 0))
+    before = image.copy()
+    ctx = FrameContext(
+        image=image,
+        draw=ImageDraw.Draw(image),
+        width=160,
+        height=90,
+        time_seconds=1.75,
+        progress=0.2,
+        features={
+            "rms": 0.76,
+            "bass_energy": 0.64,
+            "treble_energy": 0.82,
+            "beat": True,
+        },
+        preset_name="test",
+        palette_base=(255, 44, 18),
+        palette_accent=(255, 118, 20),
+        palette_beat=(255, 235, 132),
+    )
+    module = PresetModule(
+        type="elemental_field",
+        id="dual_lines",
+        element="fire",
+        behavior="dual_lines",
+        line_texture="plasma",
+        density=20,
+        bands=2,
+        opacity=0.8,
+    )
+
+    draw_elemental_field(ctx, module)
+
+    assert ImageChops.difference(before, image).getbbox() is not None
+
+
 def test_draw_lightning_element_changes_image() -> None:
     image = Image.new("RGB", (160, 90), (0, 0, 0))
     before = image.copy()
