@@ -1,7 +1,9 @@
+from pathlib import Path
+
 from typer.testing import CliRunner
 
 from tests.audio_fixtures import write_test_tone
-from wavesmith.cli import app
+from wavesmith.cli import _compact_path, app
 
 runner = CliRunner()
 
@@ -90,3 +92,14 @@ def test_analyze_rejects_missing_input(tmp_path) -> None:
 
     assert result.exit_code == 2
     assert "does not exist" in result.output
+
+
+def test_compact_path_shortens_long_cache_names() -> None:
+    path = (
+        ".cache/analysis/"
+        "b31c738b6c49a0b93adc3e41094ef031a4c1f1bad56b32c8f6de21a1a5d7fd78.analysis.json"
+    )
+
+    compact = _compact_path(Path(path))
+
+    assert compact == ".cache/analysis/b31c738b6c49....json"

@@ -20,6 +20,17 @@ app = typer.Typer(
 console = Console()
 
 
+def _compact_path(path: Path, *, keep: int = 12) -> str:
+    """Return a terminal-friendly path display."""
+    name = path.name
+    if len(name) > keep + 8:
+        name = f"{name[:keep]}...{path.suffix}"
+    parent = path.parent.as_posix()
+    if parent == ".":
+        return name
+    return f"{parent}/{name}"
+
+
 def _version_callback(value: bool) -> None:
     if value:
         console.print(f"WaveSmith {__version__}")
@@ -117,8 +128,8 @@ def render(
         raise typer.Exit(4) from exc
 
     console.print(f"[green]Rendered:[/green] {output_video} ({result.duration_seconds:.2f}s)")
-    console.print(f"analysis_cache={result.cache_status} ({result.cache_path})")
-    console.print(f"render_log={result.log_path}")
+    console.print(f"analysis_cache={result.cache_status} cache={_compact_path(result.cache_path)}")
+    console.print(f"render_log={_compact_path(result.log_path, keep=26)}")
 
 
 @app.command()

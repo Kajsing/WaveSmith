@@ -342,3 +342,25 @@ find .renders/logs -maxdepth 1 -type f | wc -l
   pruning policy.
 - Logs are plain text for easy debugging; structured JSON logs could be useful later if batch
   rendering needs machine-readable summaries.
+
+## 2026-05-01 - Post-M5 Polish
+
+### Changed
+
+- Compacted long cache paths in CLI render output so terminal summaries stay readable.
+- Added a unit test for cache path display formatting.
+- Suppressed known upstream `audioread` Python 3.13 deprecation warnings in pytest output.
+
+### Validation Run
+
+```bash
+.venv/bin/ruff check .
+.venv/bin/python -m pytest
+.venv/bin/wavesmith render .tmp/test.wav .tmp/cli-output-check.mp4 --preset neon_orb --resolution 640x360 --fps 15 --max-seconds 2 --watermark ""
+```
+
+### Result
+
+- Passed.
+- Unit test suite: 45 tests passed.
+- Render CLI output now shows compact cache/log paths.
