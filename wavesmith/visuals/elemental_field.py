@@ -78,6 +78,7 @@ def _draw_fire(
     floor = ctx.height * (0.93 - beat * 0.05)
     if behavior in {"natural", "realistic", "normal"}:
         _draw_fire_base_glow(ctx, draw, palette, opacity, intensity, bass, beat, floor)
+        _draw_solar_prominences(ctx, draw, palette, opacity, intensity, bass, treble, floor)
     else:
         flame_height = ctx.height * (0.42 + bass * 0.28 + beat * 0.18)
         for band in range(bands):
@@ -163,10 +164,8 @@ def _draw_fire_density_field(
         tongue_ceiling = flame_limit * (0.58 + source_noise * 0.42)
         tongue_fade = 1.0 - _smoothstep(tongue_ceiling, tongue_ceiling + 0.18, height_from_bottom)
         vertical_pull = _smoothstep(0.05, 0.26, height_from_bottom)
-        irregular_licks = _fire_irregular_licks(xx, height_from_bottom, warp_x, flame_limit, time)
         density = tongues * source * vertical_fade * (0.45 + base_feed * 0.22)
         density += plume_gate * source * tongue_fade * vertical_pull * (0.16 + flare * 0.1)
-        density += irregular_licks * source * vertical_fade * (0.38 + flare * 0.18)
         density += core * 0.62 + base_feed * source * (0.2 + bass * 0.1 + beat * 0.04)
         density *= 1.18 + intensity * 0.34 + beat * 0.14
     else:
@@ -187,33 +186,6 @@ def _draw_fire_density_field(
     image = Image.fromarray(rgba, mode="RGBA")
     image = image.resize((ctx.width, ctx.height), Image.Resampling.BICUBIC)
     overlay.alpha_composite(image)
-
-
-def _fire_irregular_licks(
-    xx: np.ndarray,
-    height_from_bottom: np.ndarray,
-    warp_x: np.ndarray,
-    flame_limit: float,
-    time: np.float32,
-) -> np.ndarray:
-    plumes = np.zeros_like(xx, dtype=np.float32)
-    for index in range(16):
-        seed = float(index) + 1.0
-        center = 0.04 + _hash_scalar(seed, 2.1) * 0.92
-        width = 0.018 + _hash_scalar(seed, 4.7) * 0.036
-        height = flame_limit * (0.36 + _hash_scalar(seed, 7.3) * 0.62)
-        phase = float(time) * (0.38 + _hash_scalar(seed, 8.9) * 0.46) + seed
-        sway = np.sin(height_from_bottom * math.tau * (0.8 + _hash_scalar(seed, 5.4)) + phase)
-        local_center = center + sway * 0.018 + (warp_x - 0.5) * 0.045
-        height_amount = np.clip(height_from_bottom / max(0.001, height), 0.0, 1.0)
-        local_width = width * (1.22 - height_amount * 0.74)
-        distance = xx - local_center
-        column = np.exp(-(distance * distance) / np.maximum(0.00012, local_width * local_width))
-        lift = _smoothstep(0.025, 0.18, height_from_bottom)
-        falloff = 1.0 - _smoothstep(height, height + 0.16, height_from_bottom)
-        sharpen = 1.18 + height_amount * 1.35
-        plumes += (column**sharpen) * lift * falloff * (0.65 + _hash_scalar(seed, 12.4) * 0.35)
-    return np.clip(plumes, 0.0, 1.0)
 
 
 def _draw_fire_base_glow(
@@ -238,6 +210,99 @@ def _draw_fire_base_glow(
         ),
         fill=(*glow_color, max(0, min(135, alpha))),
     )
+
+
+def _draw_solar_prominences(
+    ctx: FrameContext,
+    draw: ImageDraw.ImageDraw,
+    palette: tuple[tuple[int, int, int], tuple[int, int, int], tuple[int, int, int]],
+    opacity: float,
+    intensity: float,
+    bass: float,
+    treble: float,
+    floor: float,
+) -> None:
+    prominence_count = 7
+    for index in range(prominence_count):
+        seed = float(index) + 1.0
+        anchor = -0.08 + index / max(1, prominence_count - 1) * 1.16
+        width = ctx.width * (0.1 + _hash_scalar(seed, 4.0) * 0.15)
+        height = ctx.height * (0.15 + bass * 0.22 + intensity * 0.18)
+        height *= 0.62 + _hash_scalar(seed, 7.0) * 0.72
+        phase = ctx.time_seconds * (0.11 + _hash_scalar(seed, 3.0) * 0.08) + seed
+        sway = math.sin(phase) * ctx.width * (0.015 + treble * 0.012)
+        x0 = anchor * ctx.width - width * 0.35 + sway
+        x3 = x0 + width * (0.78 + _hash_scalar(seed, 8.0) * 0.52)
+        y0 = floor - ctx.height * (0.015 + _hash_scalar(seed, 6.0) * 0.035)
+        y3 = floor - ctx.height * (0.025 + _hash_scalar(seed, 9.0) * 0.045)
+        twist = math.sin(phase * 1.37) * ctx.width * 0.045
+        c1 = (x0 + width * 0.18 + twist, y0 - height * (0.84 + _hash_scalar(seed, 10.0) * 0.32))
+        c2 = (x3 - width * 0.22 - twist, y3 - height * (0.92 + _hash_scalar(seed, 11.0) * 0.42))
+        points = _cubic_points((x0, y0), c1, c2, (x3, y3), samples=42)
+        amount = index / max(1, prominence_count - 1)
+        outer = blend_color((255, 68, 18), palette[1], min(1.0, 0.35 + amount * 0.25))
+        middle = blend_color((255, 168, 38), palette[2], 0.28)
+        inner = blend_color((255, 238, 126), palette[2], 0.55)
+        alpha = int(255 * opacity * (0.18 + intensity * 0.28 + bass * 0.24))
+        width_outer = max(6, int(ctx.height * (0.017 + intensity * 0.018)))
+        width_mid = max(3, width_outer // 2)
+        width_inner = max(1, width_outer // 4)
+        draw.line(
+            points,
+            fill=(*outer, max(0, min(210, alpha - 18))),
+            width=width_outer,
+            joint="curve",
+        )
+        draw.line(
+            points,
+            fill=(*middle, max(0, min(240, alpha + 18))),
+            width=width_mid,
+            joint="curve",
+        )
+        draw.line(
+            points,
+            fill=(*inner, max(0, min(255, alpha + 70))),
+            width=width_inner,
+            joint="curve",
+        )
+        if index % 2 == 0:
+            filament = [
+                (x + math.sin(point_index * 0.7 + phase) * ctx.width * 0.006, y)
+                for point_index, (x, y) in enumerate(points[5:-5])
+            ]
+            draw.line(
+                filament,
+                fill=(*inner, max(0, min(160, alpha))),
+                width=max(1, width_inner - 1),
+                joint="curve",
+            )
+
+
+def _cubic_points(
+    start: tuple[float, float],
+    control_a: tuple[float, float],
+    control_b: tuple[float, float],
+    end: tuple[float, float],
+    samples: int,
+) -> list[tuple[float, float]]:
+    points: list[tuple[float, float]] = []
+    for index in range(samples):
+        t = index / max(1, samples - 1)
+        inv = 1.0 - t
+        x = (
+            inv**3 * start[0]
+            + 3.0 * inv * inv * t * control_a[0]
+            + 3.0 * inv * t * t * control_b[0]
+            + t**3 * end[0]
+        )
+        y = (
+            inv**3 * start[1]
+            + 3.0 * inv * inv * t * control_a[1]
+            + 3.0 * inv * t * t * control_b[1]
+            + t**3 * end[1]
+        )
+        points.append((x, y))
+    return points
 
 
 def _draw_fire_lashes(

@@ -1,6 +1,6 @@
 name: fire_natural_v2
 version: 1
-description: Natural music-reactive fire field with smoother flare and decay motion.
+description: Solar-style fire field driven by slow pulse and bass decay motion.
 
 canvas:
   background: radial_void
@@ -27,6 +27,6 @@ modules:
     bands: 5
     blur: 5
     opacity: 0.92
-    intensity_feature: bass_energy
-    bass_feature: bass_energy
-    motion_feature: treble_energy
+    intensity_feature: slow_pulse
+    bass_feature: slow_bass
+    motion_feature: slow_mid
