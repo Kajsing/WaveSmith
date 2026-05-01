@@ -2,11 +2,14 @@
 
 import math
 from collections.abc import Iterator
+from dataclasses import dataclass
+from pathlib import Path
 
 from PIL import Image, ImageDraw
 
-from wavesmith.audio.analyzer import analyze_audio
+from wavesmith.audio.cache import CachedAnalysis, load_or_analyze_audio
 from wavesmith.presets.loader import load_preset
+from wavesmith.presets.schema import PresetConfig, PresetModule
 from wavesmith.render.ffmpeg import (
     build_rawvideo_command,
     encode_raw_frames,
@@ -14,46 +17,104 @@ from wavesmith.render.ffmpeg import (
 )
 from wavesmith.render.options import RenderOptions
 from wavesmith.timeline.model import Timeline
+from wavesmith.utils.logging import render_log_path, write_render_log
 from wavesmith.visuals.background import draw_reactive_background
 from wavesmith.visuals.base import FrameContext
 from wavesmith.visuals.center_orb import draw_center_orb
+from wavesmith.visuals.particles import draw_particles
 from wavesmith.visuals.spectrum_ring import draw_spectrum_ring
 from wavesmith.visuals.text import draw_watermark
 from wavesmith.visuals.waveform_ribbon import draw_waveform_ribbon
 
 
-def render_video(options: RenderOptions) -> float:
-    """Render audio-reactive frames and mux them with the source audio."""
-    load_preset(options.preset)
-    source_duration = probe_duration_seconds(options.input_audio)
-    duration_seconds = min(source_duration, options.max_seconds or source_duration)
-    analysis = analyze_audio(options.input_audio, feature_fps=max(options.fps, 20))
-    timeline = Timeline(analysis)
+@dataclass(frozen=True)
+class RenderResult:
+    """Summary of a completed render."""
 
-    options.output_video.parent.mkdir(parents=True, exist_ok=True)
-    command = build_rawvideo_command(
+    duration_seconds: float
+    cache_status: str
+    cache_path: Path
+    log_path: Path
+
+
+def render_video(options: RenderOptions) -> RenderResult:
+    """Render audio-reactive frames and mux them with the source audio."""
+    preset = load_preset(options.preset)
+    log_path = render_log_path(options.input_audio)
+    duration_seconds: float | None = None
+    cached: CachedAnalysis | None = None
+    command: list[str] | None = None
+    try:
+        source_duration = probe_duration_seconds(options.input_audio)
+        duration_seconds = min(source_duration, options.max_seconds or source_duration)
+        cached = load_or_analyze_audio(
+            options.input_audio,
+            force=options.force_analysis,
+            feature_fps=max(options.fps, 20),
+        )
+        timeline = Timeline(cached.analysis)
+
+        options.output_video.parent.mkdir(parents=True, exist_ok=True)
+        command = build_rawvideo_command(
+            input_audio=options.input_audio,
+            output_video=options.output_video,
+            width=options.width,
+            height=options.height,
+            fps=options.fps,
+            duration_seconds=duration_seconds,
+            crf=options.crf,
+            ffmpeg_preset=options.ffmpeg_preset,
+        )
+        encode_raw_frames(
+            command=command,
+            frames=generate_reactive_frames(options, duration_seconds, timeline, preset),
+        )
+    except Exception as exc:
+        write_render_log(
+            path=log_path,
+            status="failed",
+            input_audio=options.input_audio,
+            output_video=options.output_video,
+            preset=preset.name,
+            duration_seconds=duration_seconds,
+            resolution=f"{options.width}x{options.height}",
+            fps=options.fps,
+            cache_status=cached.cache_status if cached else None,
+            cache_path=cached.cache_path if cached else None,
+            ffmpeg_command=command,
+            error=exc,
+        )
+        raise
+
+    write_render_log(
+        path=log_path,
+        status="success",
         input_audio=options.input_audio,
         output_video=options.output_video,
-        width=options.width,
-        height=options.height,
-        fps=options.fps,
+        preset=preset.name,
         duration_seconds=duration_seconds,
-        crf=options.crf,
-        ffmpeg_preset=options.ffmpeg_preset,
+        resolution=f"{options.width}x{options.height}",
+        fps=options.fps,
+        cache_status=cached.cache_status,
+        cache_path=cached.cache_path,
+        ffmpeg_command=command,
     )
-    encode_raw_frames(
-        command=command,
-        frames=generate_reactive_frames(options, duration_seconds, timeline),
+    return RenderResult(
+        duration_seconds=duration_seconds,
+        cache_status=cached.cache_status,
+        cache_path=cached.cache_path,
+        log_path=log_path,
     )
-    return duration_seconds
 
 
 def generate_reactive_frames(
     options: RenderOptions,
     duration_seconds: float,
     timeline: Timeline,
+    preset: PresetConfig | None = None,
 ) -> Iterator[bytes]:
     """Yield RGB frames driven by timeline features."""
+    preset = preset or load_preset(options.preset)
     frame_count = max(1, math.ceil(duration_seconds * options.fps))
     width = options.width
     height = options.height
@@ -71,14 +132,16 @@ def generate_reactive_frames(
             time_seconds=time_seconds,
             progress=progress,
             features=features,
-            preset_name=options.preset,
+            preset_name=preset.name,
+            palette_base=preset.palette.base,
+            palette_accent=preset.palette.accent,
+            palette_beat=preset.palette.beat,
         )
 
         draw_reactive_background(ctx)
-        draw_spectrum_ring(ctx)
-        draw_center_orb(ctx)
-        draw_waveform_ribbon(ctx)
-        draw_watermark(ctx, options.watermark)
+        for module in preset.modules:
+            _draw_module(ctx, module)
+        draw_watermark(ctx, _watermark_text(options, preset))
 
         yield image.tobytes()
 
@@ -109,3 +172,22 @@ def generate_placeholder_frames(
         waveform_preview=vector,
     )
     yield from generate_reactive_frames(options, duration_seconds, Timeline(analysis))
+
+
+def _draw_module(ctx: FrameContext, module: PresetModule) -> None:
+    if module.type == "center_orb":
+        draw_center_orb(ctx, module)
+    elif module.type == "spectrum_ring":
+        draw_spectrum_ring(ctx, module)
+    elif module.type == "waveform_ribbon":
+        draw_waveform_ribbon(ctx, module)
+    elif module.type == "particles":
+        draw_particles(ctx, module)
+
+
+def _watermark_text(options: RenderOptions, preset: PresetConfig) -> str | None:
+    if options.watermark is not None:
+        return options.watermark
+    if preset.watermark and preset.watermark.enabled:
+        return preset.watermark.text
+    return ""

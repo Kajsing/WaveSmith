@@ -17,6 +17,9 @@ class FrameContext:
     progress: float
     features: dict[str, Any]
     preset_name: str
+    palette_base: tuple[int, int, int]
+    palette_accent: tuple[int, int, int]
+    palette_beat: tuple[int, int, int]
 
 
 def feature_float(features: dict[str, Any], name: str, default: float = 0.0) -> float:

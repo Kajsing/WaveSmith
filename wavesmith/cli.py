@@ -99,7 +99,7 @@ def render(
             ffmpeg_preset=ffmpeg_preset,
             force_analysis=force_analysis,
         )
-        duration = render_video(options)
+        result = render_video(options)
     except RenderOptionsError as exc:
         console.print(f"[red]Invalid render options:[/red] {exc}")
         raise typer.Exit(2) from exc
@@ -116,7 +116,9 @@ def render(
         console.print(f"[red]Audio analysis failed:[/red] {exc}")
         raise typer.Exit(4) from exc
 
-    console.print(f"[green]Rendered:[/green] {output_video} ({duration:.2f}s)")
+    console.print(f"[green]Rendered:[/green] {output_video} ({result.duration_seconds:.2f}s)")
+    console.print(f"analysis_cache={result.cache_status} ({result.cache_path})")
+    console.print(f"render_log={result.log_path}")
 
 
 @app.command()

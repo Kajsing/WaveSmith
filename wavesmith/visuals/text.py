@@ -16,7 +16,7 @@ def draw_watermark(ctx: FrameContext, text: str | None) -> None:
     ctx.draw.text(
         (ctx.width - margin, ctx.height - margin),
         watermark,
-        fill=(230, 235, 240),
+        fill=ctx.palette_beat,
         font=font,
         anchor="rd",
     )

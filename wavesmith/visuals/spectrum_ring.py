@@ -2,12 +2,15 @@
 
 import math
 
+from wavesmith.presets.schema import PresetModule
 from wavesmith.visuals.base import FrameContext, blend_color, feature_float, feature_vector
 
 
-def draw_spectrum_ring(ctx: FrameContext) -> None:
+def draw_spectrum_ring(ctx: FrameContext, module: PresetModule | None = None) -> None:
     """Draw a circular spectrum visualizer."""
-    spectrum = feature_vector(ctx.features, "spectrum")
+    module_config = module.model_extra or {} if module else {}
+    bars_config = module_config.get("bars", {})
+    spectrum = feature_vector(ctx.features, bars_config.get("height_feature", "spectrum"))
     if not spectrum:
         return
 
@@ -15,8 +18,13 @@ def draw_spectrum_ring(ctx: FrameContext) -> None:
     treble = feature_float(ctx.features, "treble_energy")
     center_x = ctx.width / 2
     center_y = ctx.height / 2
-    base_radius = min(ctx.width, ctx.height) * (0.24 + rms * 0.04)
-    max_bar = min(ctx.width, ctx.height) * (0.12 + treble * 0.08)
+    radius_config = module_config.get("radius", {})
+    configured_base = float(radius_config.get("base", 220))
+    configured_scale = float(radius_config.get("scale", 40))
+    bar_scale = float(bars_config.get("scale", 180))
+    design_scale = min(ctx.width, ctx.height) / 720
+    base_radius = (configured_base + configured_scale * rms) * design_scale
+    max_bar = bar_scale * design_scale * (0.62 + treble * 0.38)
     width = max(1, min(ctx.width, ctx.height) // 260)
 
     for index, value in enumerate(spectrum):
@@ -33,5 +41,5 @@ def draw_spectrum_ring(ctx: FrameContext) -> None:
             center_x + math.cos(angle) * end_radius,
             center_y + math.sin(angle) * end_radius,
         )
-        color = blend_color((75, 220, 255), (255, 85, 210), mirrored_value)
+        color = blend_color(ctx.palette_accent, ctx.palette_beat, mirrored_value * 0.55)
         ctx.draw.line((*start, *end), fill=color, width=width)

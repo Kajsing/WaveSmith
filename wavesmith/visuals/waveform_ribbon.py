@@ -2,22 +2,27 @@
 
 import math
 
+from wavesmith.presets.schema import PresetModule
 from wavesmith.visuals.base import FrameContext, blend_color, feature_float, feature_vector
 
 
-def draw_waveform_ribbon(ctx: FrameContext) -> None:
+def draw_waveform_ribbon(ctx: FrameContext, module: PresetModule | None = None) -> None:
     """Draw a lower waveform ribbon from preview samples."""
-    waveform = feature_vector(ctx.features, "waveform_preview")
+    module_config = module.model_extra or {} if module else {}
+    waveform = feature_vector(ctx.features, module_config.get("feature", "waveform_preview"))
     if len(waveform) < 2:
         return
 
     rms = feature_float(ctx.features, "rms")
     bass = feature_float(ctx.features, "bass_energy")
-    baseline = int(ctx.height * 0.78)
-    amplitude = max(12, int(ctx.height * (0.06 + rms * 0.08)))
+    position = module_config.get("position", "bottom")
+    baseline_ratio = {"upper": 0.34, "lower": 0.72, "bottom": 0.78}.get(position, 0.78)
+    baseline = int(ctx.height * baseline_ratio)
+    configured_height = float(module_config.get("height", 160))
+    amplitude = max(10, int((configured_height / 720) * ctx.height * (0.5 + rms)))
     phase = ctx.time_seconds * math.tau * (0.18 + bass * 0.25)
-    color = blend_color((255, 235, 170), (80, 220, 255), rms)
-    shadow = blend_color((55, 25, 80), (35, 100, 130), bass)
+    color = blend_color(ctx.palette_beat, ctx.palette_accent, rms)
+    shadow = blend_color(ctx.palette_base, ctx.palette_accent, bass * 0.4)
 
     points: list[tuple[int, int]] = []
     for index, value in enumerate(waveform):

@@ -256,3 +256,89 @@ ffprobe -v error -show_streams .tmp/neon.mp4
   before tuning pulse widths, spectrum scale, and ribbon motion.
 - The CPU/Pillow renderer is fine for smoke tests, but performance should be measured before larger
   resolutions or full songs.
+
+## 2026-05-01 - M4 Preset Schema And Additional Presets
+
+### Changed
+
+- Tightened preset schema validation with typed canvas, palette, watermark, and module models.
+- Restricted module types to implemented v1 primitives.
+- Added validation for RGB palette triples and unique module IDs.
+- Made render module order YAML-driven instead of drawing every visual unconditionally.
+- Made preset palette and default watermark settings affect rendered output.
+- Implemented the previously declared `particles` visual module so `spectrum_ring` has no dead
+  preset entries.
+- Added tests for all built-in presets, invalid module types, duplicate module IDs, and preset-driven
+  frame generation.
+
+### Validation Run
+
+```bash
+.venv/bin/ruff check .
+.venv/bin/python -m pytest
+.venv/bin/python scripts/generate_test_audio.py .tmp/test.wav --seconds 3
+.venv/bin/wavesmith validate-preset presets/neon_orb.yaml
+.venv/bin/wavesmith validate-preset presets/spectrum_ring.yaml
+.venv/bin/wavesmith validate-preset presets/waveform_ribbon.yaml
+.venv/bin/wavesmith render .tmp/test.wav .tmp/neon_orb.mp4 --preset neon_orb --resolution 640x360 --fps 15 --max-seconds 3 --watermark ""
+.venv/bin/wavesmith render .tmp/test.wav .tmp/spectrum_ring.mp4 --preset spectrum_ring --resolution 640x360 --fps 15 --max-seconds 3 --watermark ""
+.venv/bin/wavesmith render .tmp/test.wav .tmp/waveform_ribbon.mp4 --preset waveform_ribbon --resolution 640x360 --fps 15 --max-seconds 3 --watermark ""
+```
+
+### Result
+
+- Passed.
+- All three built-in presets validated.
+- All three built-in presets rendered 640x360 MP4 smoke outputs with 45 video frames.
+
+### Improvement Notes
+
+- Preset files now drive module selection, but module configuration is still intentionally small.
+  Future work can make more style knobs explicit without adding arbitrary preset scripting.
+- The current renderer supports all declared module types, which is safer than allowing presets to
+  declare visuals the renderer silently ignores.
+
+## 2026-05-01 - M5 Analysis Cache And Render Logs
+
+### Changed
+
+- Added deterministic analysis cache keys based on audio bytes plus analysis parameters.
+- Added `.cache/analysis/*.analysis.json` cache read/write support.
+- `wavesmith render` now reuses analysis cache by default.
+- `--force-analysis` bypasses an existing cache entry and rewrites it.
+- Added per-render logs under `.renders/logs/`.
+- Render logs include status, input/output, preset, duration, resolution, FPS, cache status, cache
+  path, and ffmpeg command.
+- CLI render summary now reports analysis cache status and render log path.
+- Added tests for cache keys, cache hits, forced rebuilds, render log content, and log path
+  uniqueness.
+
+### Validation Run
+
+```bash
+.venv/bin/ruff check .
+.venv/bin/python -m pytest
+rm -rf .cache/analysis .renders/logs
+.venv/bin/wavesmith render .tmp/test.wav .tmp/cache1.mp4 --preset neon_orb --max-seconds 3 --resolution 640x360 --fps 15
+.venv/bin/wavesmith render .tmp/test.wav .tmp/cache2.mp4 --preset neon_orb --max-seconds 3 --resolution 640x360 --fps 15
+.venv/bin/wavesmith render .tmp/test.wav .tmp/cache3.mp4 --preset neon_orb --max-seconds 3 --resolution 640x360 --fps 15 --force-analysis
+find .renders/logs -maxdepth 1 -type f | wc -l
+```
+
+### Result
+
+- Passed.
+- Unit test suite: 44 tests passed.
+- Render 1 reported `analysis_cache=miss`.
+- Render 2 reported `analysis_cache=hit`.
+- Render 3 reported `analysis_cache=forced`.
+- Three render log files were written.
+
+### Improvement Notes
+
+- Initial M5 validation exposed a log filename collision when two renders finished in the same
+  second. Log filenames now include microseconds.
+- Cache invalidation is content-based and parameter-based, but M5 does not yet include a cache
+  pruning policy.
+- Logs are plain text for easy debugging; structured JSON logs could be useful later if batch
+  rendering needs machine-readable summaries.
