@@ -1,0 +1,32 @@
+name: fire_natural_v2
+version: 1
+description: Natural music-reactive fire field with smoother flare and decay motion.
+
+canvas:
+  background: radial_void
+  glow: true
+
+palette:
+  mode: reactive
+  base: [255, 54, 18]
+  accent: [255, 118, 20]
+  beat: [255, 230, 92]
+
+watermark:
+  enabled: true
+  text: "Christian Kajsing // kajsing.com"
+  position: bottom_right
+  opacity: 0.5
+
+modules:
+  - type: elemental_field
+    id: natural_fire
+    element: fire
+    behavior: natural
+    density: 84
+    bands: 5
+    blur: 5
+    opacity: 0.92
+    intensity_feature: bass_energy
+    bass_feature: bass_energy
+    motion_feature: treble_energy

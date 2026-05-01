@@ -6,6 +6,7 @@ from wavesmith.presets.loader import PresetError, list_builtin_presets, load_pre
 def test_builtin_presets_are_available() -> None:
     assert list_builtin_presets() == [
         "elemental_storm",
+        "fire_natural_v2",
         "inferno_portal",
         "neon_orb",
         "shader_bloom",
@@ -26,6 +27,7 @@ def test_load_builtin_preset_by_name() -> None:
     "name",
     [
         "elemental_storm",
+        "fire_natural_v2",
         "inferno_portal",
         "neon_orb",
         "shader_bloom",

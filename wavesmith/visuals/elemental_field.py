@@ -17,6 +17,7 @@ def draw_elemental_field(ctx: FrameContext, module: PresetModule | None = None) 
     density = max(8, min(int(module_config.get("density", 42)), 100))
     bands = max(1, min(int(module_config.get("bands", 5)), 10))
     blur = max(0.0, min(float(module_config.get("blur", 5)), 20.0))
+    behavior = str(module_config.get("behavior", module_config.get("fire_behavior", "dream")))
     intensity = feature_float(ctx.features, str(module_config.get("intensity_feature", "rms")))
     bass = feature_float(ctx.features, str(module_config.get("bass_feature", "bass_energy")))
     treble = feature_float(ctx.features, str(module_config.get("motion_feature", "treble_energy")))
@@ -27,7 +28,18 @@ def draw_elemental_field(ctx: FrameContext, module: PresetModule | None = None) 
     palette = _element_palette(ctx, element)
     if element == "fire":
         _draw_fire(
-            ctx, overlay, draw, palette, bands, density, opacity, intensity, bass, treble, beat
+            ctx,
+            overlay,
+            draw,
+            palette,
+            bands,
+            density,
+            opacity,
+            intensity,
+            bass,
+            treble,
+            beat,
+            behavior.lower(),
         )
     elif element == "water":
         _draw_water(ctx, draw, palette, bands, density, opacity, intensity, bass, treble, beat)
@@ -58,23 +70,37 @@ def _draw_fire(
     bass: float,
     treble: float,
     beat: float,
+    behavior: str,
 ) -> None:
-    _draw_fire_density_field(ctx, overlay, palette, opacity, intensity, bass, treble, beat)
+    _draw_fire_density_field(
+        ctx, overlay, palette, opacity, intensity, bass, treble, beat, behavior
+    )
     floor = ctx.height * (0.93 - beat * 0.05)
-    flame_height = ctx.height * (0.42 + bass * 0.28 + beat * 0.18)
-    for band in range(bands):
-        points: list[tuple[float, float]] = []
-        phase = ctx.time_seconds * (1.4 + treble * 1.8) + band * 0.9
-        for index in range(density + 1):
-            amount = index / density
-            x = amount * ctx.width
-            lick = math.sin(amount * math.tau * (2.0 + band * 0.35) + phase)
-            lick += math.sin(amount * math.tau * (6.0 + treble * 3.0) - phase * 1.3) * 0.36
-            y = floor - flame_height * (0.28 + band / bands * 0.72) * (0.72 + lick * 0.22)
-            points.append((x, y))
-        color = _rgba(_blend3(palette, band / max(1, bands - 1)), opacity, intensity, beat, band)
-        draw.line(points, fill=color, width=max(3, ctx.height // 55), joint="curve")
-    _draw_fire_embers(ctx, draw, palette, density, opacity, intensity, treble, beat, floor)
+    if behavior in {"natural", "realistic", "normal"}:
+        _draw_fire_base_glow(ctx, draw, palette, opacity, intensity, bass, beat, floor)
+    else:
+        flame_height = ctx.height * (0.42 + bass * 0.28 + beat * 0.18)
+        for band in range(bands):
+            points: list[tuple[float, float]] = []
+            phase = ctx.time_seconds * (1.4 + treble * 1.8) + band * 0.9
+            for index in range(density + 1):
+                amount = index / density
+                x = amount * ctx.width
+                lick = math.sin(amount * math.tau * (2.0 + band * 0.35) + phase)
+                lick += math.sin(amount * math.tau * (6.0 + treble * 3.0) - phase * 1.3) * 0.36
+                y = floor - flame_height * (0.28 + band / bands * 0.72) * (0.72 + lick * 0.22)
+                points.append((x, y))
+            color = _rgba(
+                _blend3(palette, band / max(1, bands - 1)),
+                opacity,
+                intensity,
+                beat,
+                band,
+            )
+            draw.line(points, fill=color, width=max(3, ctx.height // 55), joint="curve")
+    _draw_fire_embers(
+        ctx, draw, palette, density, opacity, intensity, treble, beat, floor, behavior
+    )
 
 
 def _draw_fire_density_field(
@@ -86,6 +112,7 @@ def _draw_fire_density_field(
     bass: float,
     treble: float,
     beat: float,
+    behavior: str,
 ) -> None:
     field_width = max(96, min(240, ctx.width // 3))
     field_height = max(54, min(140, ctx.height // 3))
@@ -94,32 +121,92 @@ def _draw_fire_density_field(
     xx, yy = np.meshgrid(x, y)
     height_from_bottom = 1.0 - yy
     time = np.float32(ctx.time_seconds)
-    scale = 3.2 + treble * 1.4
-    rise = time * (0.52 + bass * 0.35 + beat * 0.25)
+    natural = behavior in {"natural", "realistic", "normal"}
+    scale = 2.45 + treble * 0.5 if natural else 3.2 + treble * 1.4
+    rise = time * (0.72 + bass * 0.34 + beat * 0.12) if natural else time * (
+        0.52 + bass * 0.35 + beat * 0.25
+    )
 
     warp_x = _fbm(xx * 2.2 + time * 0.11, yy * 2.6 - rise * 0.22, octaves=3)
     warp_y = _fbm(xx * 2.8 - time * 0.08, yy * 2.1 - rise * 0.3, octaves=3)
-    warped_x = xx * scale + (warp_x - 0.5) * (0.55 + treble * 0.25)
-    warped_y = yy * (scale * 1.25) - rise + (warp_y - 0.5) * (0.35 + bass * 0.3)
+    warp_amount_x = 0.28 + treble * 0.1 if natural else 0.55 + treble * 0.25
+    warp_amount_y = 0.24 + bass * 0.16 if natural else 0.35 + bass * 0.3
+    warped_x = xx * scale + (warp_x - 0.5) * warp_amount_x
+    warped_y = yy * (scale * (1.52 if natural else 1.25)) - rise + (warp_y - 0.5) * warp_amount_y
     turbulence = _fbm(warped_x, warped_y, octaves=5)
-    source_noise = _fbm(xx * 9.0 + time * 0.13, yy * 4.0 - rise * 0.4, octaves=3)
+    source_noise = _fbm(
+        xx * (11.0 if natural else 9.0) + time * 0.13,
+        yy * 4.0 - rise * 0.4,
+        octaves=3,
+    )
 
-    base_width = 0.78 - height_from_bottom * (0.54 - bass * 0.08)
-    source = np.exp(-((xx - 0.5) ** 2) / np.maximum(0.04, base_width**2))
-    source *= 0.45 + source_noise * 0.65
-    base_feed = 1.0 - _smoothstep(0.0, 0.14, height_from_bottom)
-    vertical_fade = 1.0 - _smoothstep(0.58 + bass * 0.1, 1.0, height_from_bottom)
-    threshold = 0.36 + height_from_bottom * (0.5 - bass * 0.12)
-    threshold += (1.0 - source_noise) * 0.14
-    tongues = _smoothstep(threshold, 1.0, turbulence)
-    density = tongues * source * vertical_fade
-    density += base_feed * (0.22 + bass * 0.18 + beat * 0.08)
-    density = np.clip(density * (1.25 + intensity * 0.55 + beat * 0.22), 0.0, 1.0)
+    if natural:
+        flare = max(bass, intensity * 0.82)
+        flame_limit = 0.48 + flare * 0.3 + beat * 0.1
+        base_width = 0.82 - height_from_bottom * (0.48 - bass * 0.08)
+        source = np.exp(-((xx - 0.5) ** 2) / np.maximum(0.045, base_width**2))
+        side_fade = np.exp(-((np.abs(xx - 0.5) / 0.64) ** 4))
+        source *= side_fade * (0.64 + source_noise * 0.52)
+        base_feed = 1.0 - _smoothstep(0.0, 0.15, height_from_bottom)
+        vertical_fade = 1.0 - _smoothstep(flame_limit, flame_limit + 0.23, height_from_bottom)
+        threshold = 0.21 + height_from_bottom * (0.56 - bass * 0.18)
+        threshold += (1.0 - source_noise) * 0.12
+        tongues = _smoothstep(threshold, 0.88, turbulence + source_noise * 0.08)
+        core_falloff = 1.0 - _smoothstep(0.0, flame_limit * 0.78, height_from_bottom)
+        core = source * core_falloff * (0.22 + flare * 0.12)
+        ridges = 1.0 - np.abs(
+            np.sin((xx * (5.4 + treble * 1.4) + (warp_x - 0.5) * 0.42) * math.tau)
+        )
+        ridges = _smoothstep(0.54, 0.96, ridges + source_noise * 0.18)
+        tongue_ceiling = flame_limit * (0.58 + source_noise * 0.42)
+        tongue_fade = 1.0 - _smoothstep(tongue_ceiling, tongue_ceiling + 0.18, height_from_bottom)
+        vertical_pull = _smoothstep(0.05, 0.26, height_from_bottom)
+        density = tongues * source * vertical_fade * (0.78 + base_feed * 0.32)
+        density += ridges * source * tongue_fade * vertical_pull * (0.5 + flare * 0.25)
+        density += core + base_feed * source * (0.26 + bass * 0.14 + beat * 0.06)
+        density *= 1.24 + intensity * 0.44 + beat * 0.18
+    else:
+        base_width = 0.78 - height_from_bottom * (0.54 - bass * 0.08)
+        source = np.exp(-((xx - 0.5) ** 2) / np.maximum(0.04, base_width**2))
+        source *= 0.45 + source_noise * 0.65
+        base_feed = 1.0 - _smoothstep(0.0, 0.14, height_from_bottom)
+        vertical_fade = 1.0 - _smoothstep(0.58 + bass * 0.1, 1.0, height_from_bottom)
+        threshold = 0.36 + height_from_bottom * (0.5 - bass * 0.12)
+        threshold += (1.0 - source_noise) * 0.14
+        tongues = _smoothstep(threshold, 1.0, turbulence)
+        density = tongues * source * vertical_fade
+        density += base_feed * (0.22 + bass * 0.18 + beat * 0.08)
+        density *= 1.25 + intensity * 0.55 + beat * 0.22
+    density = np.clip(density, 0.0, 1.0)
 
     rgba = _fire_rgba(density, palette, opacity)
     image = Image.fromarray(rgba, mode="RGBA")
     image = image.resize((ctx.width, ctx.height), Image.Resampling.BICUBIC)
     overlay.alpha_composite(image)
+
+
+def _draw_fire_base_glow(
+    ctx: FrameContext,
+    draw: ImageDraw.ImageDraw,
+    palette: tuple[tuple[int, int, int], tuple[int, int, int], tuple[int, int, int]],
+    opacity: float,
+    intensity: float,
+    bass: float,
+    beat: float,
+    floor: float,
+) -> None:
+    glow_height = ctx.height * (0.045 + bass * 0.028 + beat * 0.018)
+    glow_color = _blend3(palette, 0.75)
+    alpha = int(255 * opacity * (0.09 + intensity * 0.1 + bass * 0.1 + beat * 0.05))
+    draw.ellipse(
+        (
+            ctx.width * -0.04,
+            floor - glow_height,
+            ctx.width * 1.04,
+            floor + glow_height * 0.6,
+        ),
+        fill=(*glow_color, max(0, min(135, alpha))),
+    )
 
 
 def _draw_fire_lashes(
@@ -175,17 +262,22 @@ def _draw_fire_embers(
     treble: float,
     beat: float,
     floor: float,
+    behavior: str = "dream",
 ) -> None:
-    ember_count = max(28, density // 2)
+    natural = behavior in {"natural", "realistic", "normal"}
+    ember_count = max(16, density // 3) if natural else max(28, density // 2)
     for index in range(ember_count):
-        drift = ctx.time_seconds * (0.18 + treble * 0.5)
+        drift = ctx.time_seconds * (0.12 + treble * 0.28 if natural else 0.18 + treble * 0.5)
         x = ((index * 89.17 + drift * ctx.width) % (ctx.width * 1.08)) - ctx.width * 0.04
         rise = ((index * 0.137 + ctx.progress * (0.5 + treble)) % 1.0)
-        y = floor - rise * ctx.height * (0.55 + beat * 0.12)
+        y = floor - rise * ctx.height * ((0.34 + beat * 0.08) if natural else (0.55 + beat * 0.12))
         flicker = 0.55 + abs(math.sin(index * 2.1 + ctx.time_seconds * 4.0)) * 0.45
         size = max(1, int((1 + (index % 3)) * flicker))
         color = _blend3(palette, 0.62 + (index % 5) / 14)
-        alpha = int(255 * opacity * (0.24 + intensity * 0.2 + treble * 0.26) * flicker)
+        if natural:
+            alpha = int(255 * opacity * (0.15 + intensity * 0.16 + treble * 0.14) * flicker)
+        else:
+            alpha = int(255 * opacity * (0.24 + intensity * 0.2 + treble * 0.26) * flicker)
         draw.ellipse(
             (x - size, y - size, x + size, y + size),
             fill=(*color, max(0, min(255, alpha))),
