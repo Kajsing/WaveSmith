@@ -9,6 +9,7 @@ from wavesmith.audio.features import AudioAnalysis, TimeSeries
 
 SUPPORTED_AUDIO_EXTENSIONS = {".mp3", ".wav"}
 DEFAULT_SAMPLE_RATE = 22_050
+DEFAULT_FEATURE_FPS = 20
 HOP_LENGTH = 512
 N_FFT = 2048
 SPECTRUM_BINS = 32
@@ -19,12 +20,19 @@ class AudioAnalysisError(RuntimeError):
     """Raised when audio analysis cannot be completed."""
 
 
-def analyze_audio(path: Path, *, sample_rate: int = DEFAULT_SAMPLE_RATE) -> AudioAnalysis:
+def analyze_audio(
+    path: Path,
+    *,
+    sample_rate: int = DEFAULT_SAMPLE_RATE,
+    feature_fps: int = DEFAULT_FEATURE_FPS,
+) -> AudioAnalysis:
     """Analyze an MP3 or WAV file into normalized feature series."""
     if not path.exists():
         raise AudioAnalysisError(f"Input audio file does not exist: {path}")
     if path.suffix.lower() not in SUPPORTED_AUDIO_EXTENSIONS:
         raise AudioAnalysisError("Input audio must be an MP3 or WAV file.")
+    if feature_fps < 1:
+        raise AudioAnalysisError("feature_fps must be at least 1.")
 
     try:
         audio, sr = librosa.load(path, sr=sample_rate, mono=True)
@@ -59,6 +67,29 @@ def analyze_audio(path: Path, *, sample_rate: int = DEFAULT_SAMPLE_RATE) -> Audi
     )
     spectrum_db = librosa.power_to_db(spectrum, ref=np.max)
     spectrum_normalized = _normalize_array(spectrum_db).T
+    waveform_preview = _waveform_preview(audio, sr, frame_times, duration)
+
+    bass_energy = _band_energy(magnitude, sr, 20.0, 250.0)
+    mid_energy = _band_energy(magnitude, sr, 250.0, 4_000.0)
+    treble_energy = _band_energy(magnitude, sr, 4_000.0, sr / 2)
+
+    common_length = min(
+        frame_times.size,
+        rms.size,
+        bass_energy.size,
+        mid_energy.size,
+        treble_energy.size,
+        spectrum_normalized.shape[0],
+        waveform_preview.shape[0],
+    )
+    indices = _downsample_indices(frame_times[:common_length], duration, feature_fps)
+    frame_times = frame_times[:common_length][indices]
+    rms = rms[:common_length][indices]
+    bass_energy = bass_energy[:common_length][indices]
+    mid_energy = mid_energy[:common_length][indices]
+    treble_energy = treble_energy[:common_length][indices]
+    spectrum_normalized = spectrum_normalized[:common_length][indices]
+    waveform_preview = waveform_preview[:common_length][indices]
 
     return AudioAnalysis(
         duration_seconds=round(duration, 6),
@@ -67,14 +98,11 @@ def analyze_audio(path: Path, *, sample_rate: int = DEFAULT_SAMPLE_RATE) -> Audi
         beats=_round_list(librosa.frames_to_time(beat_frames, sr=sr, hop_length=HOP_LENGTH)),
         onsets=_round_list(onset_times),
         rms=_series(frame_times, _normalize_array(rms)),
-        bass_energy=_series(frame_times, _band_energy(magnitude, sr, 20.0, 250.0)),
-        mid_energy=_series(frame_times, _band_energy(magnitude, sr, 250.0, 4_000.0)),
-        treble_energy=_series(frame_times, _band_energy(magnitude, sr, 4_000.0, sr / 2)),
+        bass_energy=_series(frame_times, bass_energy),
+        mid_energy=_series(frame_times, mid_energy),
+        treble_energy=_series(frame_times, treble_energy),
         spectrum=_vector_series(frame_times, spectrum_normalized),
-        waveform_preview=_vector_series(
-            frame_times,
-            _waveform_preview(audio, sr, frame_times, duration),
-        ),
+        waveform_preview=_vector_series(frame_times, waveform_preview),
     )
 
 
@@ -117,6 +145,17 @@ def _waveform_preview(
         samples = np.interp(target_times, sample_positions, audio)
         previews.append(np.clip((samples + 1.0) / 2.0, 0.0, 1.0))
     return np.vstack(previews)
+
+
+def _downsample_indices(times: np.ndarray, duration: float, feature_fps: int) -> np.ndarray:
+    if times.size == 0:
+        return np.array([], dtype=int)
+
+    max_points = max(2, int(np.ceil(duration * feature_fps)) + 1)
+    if times.size <= max_points:
+        return np.arange(times.size)
+
+    return np.unique(np.linspace(0, times.size - 1, max_points, dtype=int))
 
 
 def _normalize_array(values: np.ndarray) -> np.ndarray:

@@ -178,3 +178,34 @@ ffprobe -v error -show_streams .tmp/test.mp4
 - Render output does not consume analysis/timeline data yet; M3 will connect visuals to features.
 - Beat detection on very short synthetic fixtures may produce sparse or empty beat lists, which is
   acceptable for M2.
+
+## 2026-05-01 - M2 Analysis Size Policy
+
+### Changed
+
+- Added a serialized feature-rate limit to audio analysis.
+- `wavesmith analyze` now exposes `--feature-fps`, defaulting to 20.
+- Analyzer internals still use librosa's normal hop resolution, then downsample serialized
+  time-series features before writing JSON.
+- Downsampling preserves shared time axes across RMS, band energy, spectrum, and waveform preview.
+- Added tests for default feature-rate limiting, custom `--feature-fps`, and invalid feature rates.
+
+### Validation Run
+
+```bash
+.venv/bin/ruff check .
+.venv/bin/python -m pytest
+.venv/bin/python scripts/generate_test_audio.py .tmp/test.wav --seconds 5
+.venv/bin/wavesmith analyze .tmp/test.wav --out .tmp/test.analysis.json --feature-fps 10
+```
+
+### Result
+
+- Passed.
+- Unit test suite: 31 tests passed.
+- A 5 second analysis with `--feature-fps 10` produced 51 RMS/spectrum samples and 32 spectrum bins.
+
+### Known Issues
+
+- This controls serialized JSON size, not M5 cache retention or eviction policy.
+- M3 visuals should use timeline interpolation instead of assuming feature samples match render FPS.

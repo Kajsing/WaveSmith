@@ -71,6 +71,20 @@ def test_analyze_writes_json(tmp_path) -> None:
     assert "Analysis written" in result.output
 
 
+def test_analyze_accepts_feature_fps_option(tmp_path) -> None:
+    audio = tmp_path / "tone.wav"
+    output = tmp_path / "tone.analysis.json"
+    write_test_tone(audio, seconds=2.0)
+
+    result = runner.invoke(
+        app,
+        ["analyze", str(audio), "--out", str(output), "--feature-fps", "5"],
+    )
+
+    assert result.exit_code == 0
+    assert output.exists()
+
+
 def test_analyze_rejects_missing_input(tmp_path) -> None:
     result = runner.invoke(app, ["analyze", str(tmp_path / "missing.wav")])
 

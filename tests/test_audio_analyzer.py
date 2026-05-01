@@ -3,7 +3,7 @@ import json
 import pytest
 
 from tests.audio_fixtures import write_test_tone
-from wavesmith.audio.analyzer import AudioAnalysisError, analyze_audio
+from wavesmith.audio.analyzer import DEFAULT_FEATURE_FPS, AudioAnalysisError, analyze_audio
 from wavesmith.audio.features import read_analysis
 
 
@@ -40,3 +40,31 @@ def test_analysis_json_roundtrip(tmp_path) -> None:
 def test_analyze_audio_rejects_missing_file(tmp_path) -> None:
     with pytest.raises(AudioAnalysisError, match="does not exist"):
         analyze_audio(tmp_path / "missing.wav")
+
+
+def test_analyze_audio_limits_serialized_feature_rate(tmp_path) -> None:
+    audio = tmp_path / "tone.wav"
+    write_test_tone(audio, seconds=2.0)
+
+    analysis = analyze_audio(audio, feature_fps=5)
+
+    assert len(analysis.rms.values) <= int(analysis.duration_seconds * 5) + 1
+    assert len(analysis.spectrum.values) == len(analysis.rms.values)
+    assert len(analysis.waveform_preview.values) == len(analysis.rms.values)
+
+
+def test_analyze_audio_uses_default_feature_rate_limit(tmp_path) -> None:
+    audio = tmp_path / "tone.wav"
+    write_test_tone(audio, seconds=2.0)
+
+    analysis = analyze_audio(audio)
+
+    assert len(analysis.rms.values) <= int(analysis.duration_seconds * DEFAULT_FEATURE_FPS) + 1
+
+
+def test_analyze_audio_rejects_invalid_feature_rate(tmp_path) -> None:
+    audio = tmp_path / "tone.wav"
+    write_test_tone(audio)
+
+    with pytest.raises(AudioAnalysisError, match="feature_fps"):
+        analyze_audio(audio, feature_fps=0)

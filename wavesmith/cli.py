@@ -7,7 +7,7 @@ import typer
 from rich.console import Console
 
 from wavesmith import __version__
-from wavesmith.audio.analyzer import AudioAnalysisError, analyze_audio
+from wavesmith.audio.analyzer import DEFAULT_FEATURE_FPS, AudioAnalysisError, analyze_audio
 from wavesmith.presets.loader import PresetError, list_builtin_presets, load_preset
 from wavesmith.render.ffmpeg import FfmpegMissingError, FfmpegRenderError
 from wavesmith.render.options import RenderOptionsError, build_render_options
@@ -120,6 +120,14 @@ def render(
 def analyze(
     input_audio: Annotated[Path, typer.Argument(help="Input MP3 or WAV file.")],
     out: Annotated[Path | None, typer.Option("--out", help="Optional analysis JSON path.")] = None,
+    feature_fps: Annotated[
+        int,
+        typer.Option(
+            "--feature-fps",
+            min=1,
+            help="Maximum serialized feature samples per second.",
+        ),
+    ] = DEFAULT_FEATURE_FPS,
     force: Annotated[bool, typer.Option("--force", help="Force analysis refresh.")] = False,
 ) -> None:
     """Analyze audio and write feature JSON."""
@@ -128,7 +136,7 @@ def analyze(
 
     output_path = out or input_audio.with_suffix(".analysis.json")
     try:
-        analysis = analyze_audio(input_audio)
+        analysis = analyze_audio(input_audio, feature_fps=feature_fps)
     except AudioAnalysisError as exc:
         console.print(f"[red]Audio analysis failed:[/red] {exc}")
         raise typer.Exit(2) from exc
