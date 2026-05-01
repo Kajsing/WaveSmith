@@ -24,7 +24,10 @@ modules:
     element: ice
     behavior: cracked_sheet
     line_texture: grain
-    density: 72
+    shard_texture: grain
+    measurement_points: 128
+    crack_points: 72
+    density: 96
     bands: 6
     blur: 4
     opacity: 0.78

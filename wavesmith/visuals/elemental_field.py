@@ -21,10 +21,15 @@ def draw_elemental_field(ctx: FrameContext, module: PresetModule | None = None) 
     line_texture = str(
         module_config.get("line_texture", module_config.get("prominence_texture", "plasma"))
     )
+    shard_texture = str(
+        module_config.get("shard_texture", module_config.get("ice_texture", "grain"))
+    )
     line_direction = str(module_config.get("line_direction", "left_to_right"))
     line_direction_seed = str(
         module_config.get("line_direction_seed", module.id if module else ctx.preset_name)
     )
+    measurement_points = max(0, min(int(module_config.get("measurement_points", 0)), 512))
+    crack_points = max(0, min(int(module_config.get("crack_points", 0)), 128))
     intensity = feature_float(ctx.features, str(module_config.get("intensity_feature", "rms")))
     bass = feature_float(ctx.features, str(module_config.get("bass_feature", "bass_energy")))
     treble = feature_float(ctx.features, str(module_config.get("motion_feature", "treble_energy")))
@@ -68,6 +73,9 @@ def draw_elemental_field(ctx: FrameContext, module: PresetModule | None = None) 
             beat,
             behavior.lower(),
             line_texture.lower(),
+            shard_texture.lower(),
+            measurement_points,
+            crack_points,
         )
     elif element == "lightning":
         _draw_lightning(ctx, draw, palette, bands, density, opacity, intensity, bass, treble, beat)
@@ -834,6 +842,9 @@ def _draw_ice(
     beat: float,
     behavior: str,
     line_texture: str,
+    shard_texture: str,
+    measurement_points: int,
+    crack_points: int,
 ) -> None:
     if behavior in {"cracked_sheet", "glacial_shards", "sheet", "cracks"}:
         _draw_cracked_ice_sheet(
@@ -848,6 +859,9 @@ def _draw_ice(
             treble,
             beat,
             line_texture,
+            shard_texture,
+            measurement_points,
+            crack_points,
         )
         return
 
@@ -890,6 +904,9 @@ def _draw_cracked_ice_sheet(
     treble: float,
     beat: float,
     line_texture: str,
+    shard_texture: str,
+    measurement_points: int,
+    crack_points: int,
 ) -> None:
     _draw_ice_sheet_surface(ctx, overlay, palette, opacity, intensity, bass, beat)
     glow = Image.new("RGBA", (ctx.width, ctx.height), (0, 0, 0, 0))
@@ -897,7 +914,16 @@ def _draw_cracked_ice_sheet(
     sharp = Image.new("RGBA", (ctx.width, ctx.height), (0, 0, 0, 0))
     sharp_draw = ImageDraw.Draw(sharp)
     _draw_ice_cracks(
-        ctx, glow_draw, sharp_draw, opacity, intensity, bass, treble, beat, line_texture
+        ctx,
+        glow_draw,
+        sharp_draw,
+        opacity,
+        intensity,
+        bass,
+        treble,
+        beat,
+        line_texture,
+        crack_points,
     )
     _draw_glacial_shards(
         ctx,
@@ -911,6 +937,8 @@ def _draw_cracked_ice_sheet(
         bass,
         treble,
         beat,
+        shard_texture,
+        measurement_points,
     )
     overlay.alpha_composite(glow.filter(ImageFilter.GaussianBlur(radius=max(3, ctx.height // 52))))
     overlay.alpha_composite(sharp)
@@ -975,11 +1003,12 @@ def _draw_ice_cracks(
     treble: float,
     beat: float,
     line_texture: str,
+    crack_points: int,
 ) -> None:
-    crack_count = 12
+    crack_count = max(12, min(32, crack_points // 4)) if crack_points else 12
     for index in range(crack_count):
         seed = index + 1.0
-        points = _ice_crack_points(ctx, seed)
+        points = _ice_crack_points(ctx, seed, crack_points)
         crack_alpha = int(255 * opacity * (0.2 + bass * 0.28 + intensity * 0.18 + beat * 0.18))
         glow_color = (72, 220, 255)
         core_color = (214, 250, 255)
@@ -1017,14 +1046,19 @@ def _draw_ice_cracks(
             )
 
 
-def _ice_crack_points(ctx: FrameContext, seed: float) -> list[tuple[float, float]]:
+def _ice_crack_points(
+    ctx: FrameContext,
+    seed: float,
+    crack_points: int,
+) -> list[tuple[float, float]]:
     start_x = _hash_scalar(seed, 2.0) * ctx.width
     start_y = _ice_horizon_y(ctx) + ctx.height * (0.1 + _hash_scalar(seed, 3.0) * 0.44)
     direction = -1.0 if _hash_scalar(seed, 4.0) < 0.5 else 1.0
     angle = direction * math.pi * (0.03 + _hash_scalar(seed, 4.5) * 0.18)
     length = ctx.width * (0.22 + _hash_scalar(seed, 5.0) * 0.5)
     points: list[tuple[float, float]] = []
-    steps = 9 + int(_hash_scalar(seed, 6.0) * 7)
+    steps = max(9, min(36, crack_points // 3)) if crack_points else 9
+    steps += int(_hash_scalar(seed, 6.0) * 7)
     for step in range(steps):
         amount = step / max(1, steps - 1)
         jitter = (_hash_scalar(seed + step, 7.0) - 0.5) * ctx.height * 0.045
@@ -1079,14 +1113,17 @@ def _draw_glacial_shards(
     bass: float,
     treble: float,
     beat: float,
+    shard_texture: str,
+    measurement_points: int,
 ) -> None:
     spectrum = feature_vector(ctx.features, "spectrum")
-    shard_count = max(24, min(54, density))
+    shard_count = measurement_points or density
+    shard_count = max(32, min(180, shard_count))
     horizon_y = _ice_horizon_y(ctx)
     for index in range(shard_count):
         seed = index + 12.0
         x_amount = (index + _hash_scalar(seed, 1.0) * 0.6) / max(1, shard_count - 1)
-        spectrum_value = spectrum[index % len(spectrum)] if spectrum else intensity
+        spectrum_value = _sample_vector(spectrum, x_amount, intensity)
         seed = index + 12.0
         depth = _hash_scalar(seed, 5.0)
         perspective = 0.28 + depth * 0.72
@@ -1109,12 +1146,42 @@ def _draw_glacial_shards(
         glow_draw.polygon((left, tip, right), fill=(*fill, max(0, min(90, alpha))))
         sharp_draw.polygon((left, tip, right), fill=(*fill, max(0, min(145, alpha))))
         glint_alpha = int(255 * opacity * (0.12 + treble * 0.24 + beat * 0.12))
-        if index % max(2, bands) == 0:
-            sharp_draw.line(
-                (x, base_y, tip[0], tip[1]),
-                fill=(*palette[2], max(0, min(220, glint_alpha))),
-                width=max(1, int(width * 0.18)),
+        if index % max(2, bands) == 0 or shard_texture not in {"", "none", "smooth", "solid"}:
+            _draw_textured_polyline(
+                sharp_draw,
+                [(x, base_y), tip],
+                palette[2],
+                max(0, min(220, glint_alpha)),
+                max(1, int(width * 0.18)),
+                shard_texture,
+                seed * 91.0,
+                ctx.time_seconds * (0.25 + treble * 0.9),
             )
+        if shard_texture not in {"", "none", "smooth", "solid"}:
+            edge_alpha = max(0, min(160, int(alpha * 0.75)))
+            _draw_textured_polyline(
+                sharp_draw,
+                [left, tip, right],
+                blend_color((90, 220, 255), palette[2], 0.35),
+                edge_alpha,
+                max(1, int(width * 0.12)),
+                shard_texture,
+                seed * 107.0,
+                ctx.time_seconds * (0.2 + treble * 0.7),
+                soft=True,
+            )
+
+
+def _sample_vector(values: list[float], amount: float, default: float) -> float:
+    if not values:
+        return default
+    if len(values) == 1:
+        return values[0]
+    position = _clamp(amount, 0.0, 1.0) * (len(values) - 1)
+    left = int(math.floor(position))
+    right = min(len(values) - 1, left + 1)
+    blend = position - left
+    return values[left] * (1.0 - blend) + values[right] * blend
 
 
 def _draw_plasma(
