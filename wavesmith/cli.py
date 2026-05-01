@@ -8,6 +8,9 @@ from rich.console import Console
 
 from wavesmith import __version__
 from wavesmith.presets.loader import PresetError, list_builtin_presets, load_preset
+from wavesmith.render.ffmpeg import FfmpegMissingError, FfmpegRenderError
+from wavesmith.render.options import RenderOptionsError, build_render_options
+from wavesmith.render.pipeline import render_video
 
 app = typer.Typer(
     help="Local-first audio-reactive video generation for music visualizers.",
@@ -81,15 +84,35 @@ def render(
         typer.Option("--force-analysis", help="Bypass any future analysis cache."),
     ] = False,
 ) -> None:
-    """Placeholder for rendering one audio file to one video file."""
-    console.print("[yellow]Render is planned for M1+ and is not implemented in M0.[/yellow]")
-    console.print(f"input={input_audio}")
-    console.print(f"output={output_video}")
-    console.print(f"preset={preset}")
-    console.print(f"resolution={resolution}, fps={fps}, max_seconds={max_seconds}")
-    console.print(f"watermark={watermark}, crf={crf}, ffmpeg_preset={ffmpeg_preset}")
-    console.print(f"force_analysis={force_analysis}")
-    raise typer.Exit(1)
+    """Render one audio file to one MP4 video."""
+    try:
+        options = build_render_options(
+            input_audio=input_audio,
+            output_video=output_video,
+            preset=preset,
+            resolution=resolution,
+            fps=fps,
+            max_seconds=max_seconds,
+            watermark=watermark,
+            crf=crf,
+            ffmpeg_preset=ffmpeg_preset,
+            force_analysis=force_analysis,
+        )
+        duration = render_video(options)
+    except RenderOptionsError as exc:
+        console.print(f"[red]Invalid render options:[/red] {exc}")
+        raise typer.Exit(2) from exc
+    except PresetError as exc:
+        console.print(f"[red]Preset error:[/red] {exc}")
+        raise typer.Exit(2) from exc
+    except FfmpegMissingError as exc:
+        console.print(f"[red]Missing dependency:[/red] {exc}")
+        raise typer.Exit(3) from exc
+    except FfmpegRenderError as exc:
+        console.print(f"[red]Render failed:[/red] {exc}")
+        raise typer.Exit(4) from exc
+
+    console.print(f"[green]Rendered:[/green] {output_video} ({duration:.2f}s)")
 
 
 @app.command()

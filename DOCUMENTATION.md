@@ -75,3 +75,39 @@ Result: passed with Python 3.11.15 and full project dependencies.
 - GitHub push from WSL should use SSH, for example
   `git@github.com:Kajsing/WaveSmith.git`, because the current HTTPS remote prompts for
   credentials in a way Codex cannot answer non-interactively.
+
+## 2026-05-01 - M1 Single-File Render Skeleton
+
+### Changed
+
+- Replaced the `render` placeholder with a working single-file MP4 render path.
+- Added render option validation for input file, output extension, FPS, duration limit, and
+  even-numbered MP4 resolutions.
+- Added ffprobe duration probing and ffmpeg raw RGB frame streaming.
+- Added deterministic placeholder frame generation with simple visual motion and watermark text.
+- Added `scripts/generate_test_audio.py` for local WAV smoke-test fixtures.
+- Added tests for ffmpeg command construction, render option validation, and placeholder frame
+  generation.
+
+### Validation Run
+
+```bash
+.venv/bin/ruff check .
+.venv/bin/python -m pytest
+.venv/bin/python scripts/generate_test_audio.py .tmp/test.wav --seconds 5
+.venv/bin/wavesmith render .tmp/test.wav .tmp/test.mp4 --preset neon_orb --resolution 640x360 --fps 15 --max-seconds 5
+ffprobe -v error -show_streams .tmp/test.mp4
+```
+
+### Result
+
+- Passed.
+- Unit test suite: 13 tests passed.
+- Smoke render produced `.tmp/test.mp4`.
+- ffprobe confirmed one H.264 video stream and one AAC audio stream, both 5 seconds long.
+
+### Known Issues
+
+- Frames are deterministic placeholder visuals, not audio-reactive yet.
+- Audio is re-encoded to AAC for MP4 compatibility.
+- Render logs and analysis cache remain future milestones.
