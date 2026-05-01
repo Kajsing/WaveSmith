@@ -74,7 +74,6 @@ def _draw_fire(
             points.append((x, y))
         color = _rgba(_blend3(palette, band / max(1, bands - 1)), opacity, intensity, beat, band)
         draw.line(points, fill=color, width=max(3, ctx.height // 55), joint="curve")
-    _draw_fire_lashes(ctx, draw, palette, density, opacity, intensity, bass, treble, beat, floor)
     _draw_fire_embers(ctx, draw, palette, density, opacity, intensity, treble, beat, floor)
 
 
