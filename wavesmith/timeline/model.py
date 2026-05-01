@@ -26,6 +26,24 @@ class Timeline:
             "onset": _is_near_event(time_seconds, self.analysis.onsets),
             "beat_decay": _event_decay(time_seconds, self.analysis.beats, release_seconds=1.4),
             "rms": _interpolate_series(self.analysis.rms, time_seconds),
+            "left_energy": _series_or_fallback(
+                self.analysis.left_energy, self.analysis.rms, time_seconds
+            ),
+            "right_energy": _series_or_fallback(
+                self.analysis.right_energy, self.analysis.rms, time_seconds
+            ),
+            "left_bass": _series_or_fallback(
+                self.analysis.left_bass, self.analysis.bass_energy, time_seconds
+            ),
+            "right_bass": _series_or_fallback(
+                self.analysis.right_bass, self.analysis.bass_energy, time_seconds
+            ),
+            "left_treble": _series_or_fallback(
+                self.analysis.left_treble, self.analysis.treble_energy, time_seconds
+            ),
+            "right_treble": _series_or_fallback(
+                self.analysis.right_treble, self.analysis.treble_energy, time_seconds
+            ),
             "bass_energy": _interpolate_series(self.analysis.bass_energy, time_seconds),
             "mid_energy": _interpolate_series(self.analysis.mid_energy, time_seconds),
             "treble_energy": _interpolate_series(self.analysis.treble_energy, time_seconds),
@@ -60,6 +78,16 @@ def _interpolate_series(series: TimeSeries, time_seconds: float) -> float | list
     values = np.asarray(series.values, dtype=float)
     interpolated = np.interp(time_seconds, np.asarray(series.times, dtype=float), values)
     return round(float(interpolated), 6)
+
+
+def _series_or_fallback(series: TimeSeries, fallback: TimeSeries, time_seconds: float) -> float:
+    value = _interpolate_series(series, time_seconds)
+    if isinstance(value, int | float) and (series.times or series.values):
+        return float(value)
+    fallback_value = _interpolate_series(fallback, time_seconds)
+    if isinstance(fallback_value, int | float):
+        return float(fallback_value)
+    return 0.0
 
 
 def _is_near_event(time_seconds: float, events: list[float], window_seconds: float = 0.05) -> bool:

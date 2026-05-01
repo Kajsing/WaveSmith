@@ -31,6 +31,12 @@ class AudioAnalysis(BaseModel):
     beats: list[float]
     onsets: list[float]
     rms: TimeSeries
+    left_energy: TimeSeries = Field(default_factory=TimeSeries)
+    right_energy: TimeSeries = Field(default_factory=TimeSeries)
+    left_bass: TimeSeries = Field(default_factory=TimeSeries)
+    right_bass: TimeSeries = Field(default_factory=TimeSeries)
+    left_treble: TimeSeries = Field(default_factory=TimeSeries)
+    right_treble: TimeSeries = Field(default_factory=TimeSeries)
     bass_energy: TimeSeries
     mid_energy: TimeSeries
     treble_energy: TimeSeries
@@ -41,6 +47,12 @@ class AudioAnalysis(BaseModel):
         """Validate nested time series lengths after pydantic construction."""
         for series in (
             self.rms,
+            self.left_energy,
+            self.right_energy,
+            self.left_bass,
+            self.right_bass,
+            self.left_treble,
+            self.right_treble,
             self.bass_energy,
             self.mid_energy,
             self.treble_energy,

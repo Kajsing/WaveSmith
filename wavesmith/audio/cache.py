@@ -8,7 +8,7 @@ from wavesmith.audio.analyzer import DEFAULT_FEATURE_FPS, DEFAULT_SAMPLE_RATE, a
 from wavesmith.audio.features import AudioAnalysis, read_analysis
 
 DEFAULT_ANALYSIS_CACHE_DIR = Path(".cache/analysis")
-ANALYSIS_CACHE_VERSION = "v1"
+ANALYSIS_CACHE_VERSION = "v2"
 
 
 @dataclass(frozen=True)

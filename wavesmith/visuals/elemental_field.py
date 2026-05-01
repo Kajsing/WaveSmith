@@ -134,12 +134,17 @@ def _draw_dual_fire_lines(
     sharp_draw = ImageDraw.Draw(sharp)
     for line_index in range(2):
         amount = line_index / 1
+        channel = _dual_line_channel_features(ctx, line_index, intensity, bass, treble)
         points = _dual_fire_line_points(ctx, line_index)
         outer = blend_color((255, 58, 18), palette[1], 0.35 + amount * 0.12)
         middle = blend_color((255, 158, 34), palette[2], 0.22)
         inner = blend_color((255, 236, 148), palette[2], 0.62)
-        line_alpha = int(255 * opacity * (0.28 + intensity * 0.26 + bass * 0.18 + beat * 0.08))
-        line_width = max(3, int(ctx.height * (0.009 + intensity * 0.006)))
+        line_alpha = int(
+            255
+            * opacity
+            * (0.22 + channel["energy"] * 0.32 + channel["bass"] * 0.2 + beat * 0.08)
+        )
+        line_width = max(3, int(ctx.height * (0.008 + channel["energy"] * 0.008)))
         _draw_textured_polyline(
             glow_draw,
             points,
@@ -176,9 +181,9 @@ def _draw_dual_fire_lines(
             points,
             palette,
             opacity,
-            intensity,
-            bass,
-            treble,
+            channel["energy"],
+            channel["bass"],
+            channel["treble"],
             beat,
             line_index,
             ctx.height,
@@ -187,12 +192,28 @@ def _draw_dual_fire_lines(
     overlay.alpha_composite(sharp)
 
 
+def _dual_line_channel_features(
+    ctx: FrameContext,
+    line_index: int,
+    fallback_energy: float,
+    fallback_bass: float,
+    fallback_treble: float,
+) -> dict[str, float]:
+    side = "left" if line_index == 0 else "right"
+    return {
+        "energy": feature_float(ctx.features, f"{side}_energy", fallback_energy),
+        "bass": feature_float(ctx.features, f"{side}_bass", fallback_bass),
+        "treble": feature_float(ctx.features, f"{side}_treble", fallback_treble),
+    }
+
+
 def _dual_fire_line_points(ctx: FrameContext, line_index: int) -> list[tuple[float, float]]:
     points: list[tuple[float, float]] = []
     far = (-ctx.width * 0.1, ctx.height * (0.34 + line_index * 0.13))
     near = (ctx.width * 1.08, ctx.height * (0.59 + line_index * 0.18))
-    for index in range(120):
-        amount = index / 119
+    sample_count = 260
+    for index in range(sample_count):
+        amount = index / (sample_count - 1)
         perspective = amount**1.18
         x = far[0] + (near[0] - far[0]) * perspective
         y = far[1] + (near[1] - far[1]) * perspective
@@ -215,7 +236,7 @@ def _draw_dual_line_flames(
 ) -> None:
     if len(points) < 3:
         return
-    for index in range(3, len(points) - 3, 2):
+    for index in range(3, len(points) - 3):
         amount = index / max(1, len(points) - 1)
         seed = index * 0.73 + line_index * 19.0
         flicker = _hash_scalar(math.floor(amount * 180.0 + treble * 18.0), seed)

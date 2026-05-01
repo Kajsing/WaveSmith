@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from tests.audio_fixtures import write_test_tone
+from tests.audio_fixtures import write_stereo_split_tone, write_test_tone
 from wavesmith.audio.analyzer import DEFAULT_FEATURE_FPS, AudioAnalysisError, analyze_audio
 from wavesmith.audio.features import read_analysis
 
@@ -17,10 +17,31 @@ def test_analyze_audio_returns_required_normalized_features(tmp_path) -> None:
     assert analysis.sample_rate == 22_050
     assert analysis.tempo_bpm >= 0
     assert len(analysis.rms.times) == len(analysis.rms.values)
+    assert len(analysis.left_energy.values) == len(analysis.rms.values)
+    assert len(analysis.right_energy.values) == len(analysis.rms.values)
     assert len(analysis.spectrum.values[0]) == 32
     assert len(analysis.waveform_preview.values[0]) == 32
     assert all(0.0 <= value <= 1.0 for value in analysis.rms.values)
+    assert all(0.0 <= value <= 1.0 for value in analysis.left_energy.values)
+    assert all(0.0 <= value <= 1.0 for value in analysis.right_energy.values)
     assert all(0.0 <= value <= 1.0 for row in analysis.spectrum.values for value in row)
+
+
+def test_analyze_audio_exposes_stereo_channel_features(tmp_path) -> None:
+    audio = tmp_path / "stereo.wav"
+    write_stereo_split_tone(audio)
+
+    analysis = analyze_audio(audio)
+
+    assert len(analysis.left_bass.values) == len(analysis.rms.values)
+    assert len(analysis.right_treble.values) == len(analysis.rms.values)
+    assert _mean_body(analysis.left_bass.values) > _mean_body(analysis.right_bass.values)
+    assert _mean_body(analysis.right_treble.values) > _mean_body(analysis.left_treble.values)
+
+
+def _mean_body(values: list[float]) -> float:
+    body = values[2:-2] or values
+    return sum(body) / len(body)
 
 
 def test_analysis_json_roundtrip(tmp_path) -> None:

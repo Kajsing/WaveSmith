@@ -35,10 +35,11 @@ def analyze_audio(
         raise AudioAnalysisError("feature_fps must be at least 1.")
 
     try:
-        audio, sr = librosa.load(path, sr=sample_rate, mono=True)
+        audio_raw, sr = librosa.load(path, sr=sample_rate, mono=False)
     except Exception as exc:  # pragma: no cover - library-specific errors vary
         raise AudioAnalysisError(f"Could not load audio file: {path}") from exc
 
+    left_audio, right_audio, audio = _stereo_channels(audio_raw)
     if audio.size == 0:
         raise AudioAnalysisError("Input audio contains no samples.")
 
@@ -48,7 +49,11 @@ def analyze_audio(
 
     frame_times = _frame_times(audio, sr)
     magnitude = np.abs(librosa.stft(audio, n_fft=N_FFT, hop_length=HOP_LENGTH))
+    left_magnitude = np.abs(librosa.stft(left_audio, n_fft=N_FFT, hop_length=HOP_LENGTH))
+    right_magnitude = np.abs(librosa.stft(right_audio, n_fft=N_FFT, hop_length=HOP_LENGTH))
     rms = librosa.feature.rms(y=audio, frame_length=N_FFT, hop_length=HOP_LENGTH)[0]
+    left_rms = librosa.feature.rms(y=left_audio, frame_length=N_FFT, hop_length=HOP_LENGTH)[0]
+    right_rms = librosa.feature.rms(y=right_audio, frame_length=N_FFT, hop_length=HOP_LENGTH)[0]
     tempo_bpm, beat_frames = librosa.beat.beat_track(y=audio, sr=sr, hop_length=HOP_LENGTH)
     onset_times = librosa.onset.onset_detect(
         y=audio,
@@ -72,22 +77,38 @@ def analyze_audio(
     bass_energy = _band_energy(magnitude, sr, 20.0, 250.0)
     mid_energy = _band_energy(magnitude, sr, 250.0, 4_000.0)
     treble_energy = _band_energy(magnitude, sr, 4_000.0, sr / 2)
+    left_bass = _band_energy(left_magnitude, sr, 20.0, 250.0)
+    right_bass = _band_energy(right_magnitude, sr, 20.0, 250.0)
+    left_treble = _band_energy(left_magnitude, sr, 4_000.0, sr / 2)
+    right_treble = _band_energy(right_magnitude, sr, 4_000.0, sr / 2)
 
     common_length = min(
         frame_times.size,
         rms.size,
+        left_rms.size,
+        right_rms.size,
         bass_energy.size,
         mid_energy.size,
         treble_energy.size,
+        left_bass.size,
+        right_bass.size,
+        left_treble.size,
+        right_treble.size,
         spectrum_normalized.shape[0],
         waveform_preview.shape[0],
     )
     indices = _downsample_indices(frame_times[:common_length], duration, feature_fps)
     frame_times = frame_times[:common_length][indices]
     rms = rms[:common_length][indices]
+    left_rms = left_rms[:common_length][indices]
+    right_rms = right_rms[:common_length][indices]
     bass_energy = bass_energy[:common_length][indices]
     mid_energy = mid_energy[:common_length][indices]
     treble_energy = treble_energy[:common_length][indices]
+    left_bass = left_bass[:common_length][indices]
+    right_bass = right_bass[:common_length][indices]
+    left_treble = left_treble[:common_length][indices]
+    right_treble = right_treble[:common_length][indices]
     spectrum_normalized = spectrum_normalized[:common_length][indices]
     waveform_preview = waveform_preview[:common_length][indices]
 
@@ -98,12 +119,31 @@ def analyze_audio(
         beats=_round_list(librosa.frames_to_time(beat_frames, sr=sr, hop_length=HOP_LENGTH)),
         onsets=_round_list(onset_times),
         rms=_series(frame_times, _normalize_array(rms)),
+        left_energy=_series(frame_times, _normalize_array(left_rms)),
+        right_energy=_series(frame_times, _normalize_array(right_rms)),
+        left_bass=_series(frame_times, left_bass),
+        right_bass=_series(frame_times, right_bass),
+        left_treble=_series(frame_times, left_treble),
+        right_treble=_series(frame_times, right_treble),
         bass_energy=_series(frame_times, bass_energy),
         mid_energy=_series(frame_times, mid_energy),
         treble_energy=_series(frame_times, treble_energy),
         spectrum=_vector_series(frame_times, spectrum_normalized),
         waveform_preview=_vector_series(frame_times, waveform_preview),
     )
+
+
+def _stereo_channels(audio: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    if audio.ndim == 1:
+        mono = np.asarray(audio, dtype=float)
+        return mono, mono, mono
+    if audio.shape[0] == 1:
+        mono = np.asarray(audio[0], dtype=float)
+        return mono, mono, mono
+    left = np.asarray(audio[0], dtype=float)
+    right = np.asarray(audio[1], dtype=float)
+    mono = (left + right) * 0.5
+    return left, right, mono
 
 
 def _frame_times(audio: np.ndarray, sample_rate: int) -> np.ndarray:
