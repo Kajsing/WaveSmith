@@ -77,8 +77,8 @@ def _draw_fire(
     )
     floor = ctx.height * (0.93 - beat * 0.05)
     if behavior in {"natural", "realistic", "normal"}:
-        _draw_fire_base_glow(ctx, draw, palette, opacity, intensity, bass, beat, floor)
-        _draw_solar_prominences(ctx, draw, palette, opacity, intensity, bass, treble, floor)
+        _draw_solar_surface(ctx, overlay, palette, opacity, intensity, bass, beat)
+        _draw_solar_prominences(ctx, overlay, draw, palette, opacity, intensity, bass, treble)
     else:
         flame_height = ctx.height * (0.42 + bass * 0.28 + beat * 0.18)
         for band in range(bands):
@@ -188,94 +188,151 @@ def _draw_fire_density_field(
     overlay.alpha_composite(image)
 
 
-def _draw_fire_base_glow(
+def _draw_solar_surface(
     ctx: FrameContext,
-    draw: ImageDraw.ImageDraw,
+    overlay: Image.Image,
     palette: tuple[tuple[int, int, int], tuple[int, int, int], tuple[int, int, int]],
     opacity: float,
     intensity: float,
     bass: float,
     beat: float,
-    floor: float,
 ) -> None:
-    glow_height = ctx.height * (0.045 + bass * 0.028 + beat * 0.018)
-    glow_color = _blend3(palette, 0.75)
-    alpha = int(255 * opacity * (0.09 + intensity * 0.1 + bass * 0.1 + beat * 0.05))
-    draw.ellipse(
-        (
-            ctx.width * -0.04,
-            floor - glow_height,
-            ctx.width * 1.04,
-            floor + glow_height * 0.6,
-        ),
-        fill=(*glow_color, max(0, min(135, alpha))),
+    surface_width = max(160, min(360, ctx.width // 2))
+    surface_height = max(90, min(220, ctx.height // 2))
+    x = np.linspace(0.0, 1.0, surface_width, dtype=np.float32)
+    y = np.linspace(0.0, 1.0, surface_height, dtype=np.float32)
+    xx, yy = np.meshgrid(x, y)
+    time = np.float32(ctx.time_seconds)
+    cx, cy, rx, ry = _solar_ellipse(surface_width, surface_height)
+    ellipse = ((xx * surface_width - cx) / rx) ** 2 + ((yy * surface_height - cy) / ry) ** 2
+    mask = ellipse <= 1.0
+    limb = np.clip(1.0 - np.abs(ellipse - 1.0) * 18.0, 0.0, 1.0)
+    texture = _fbm(xx * 5.2 + time * 0.035, yy * 4.4 - time * 0.018, octaves=5)
+    granules = _fbm(xx * 18.0 - time * 0.06, yy * 13.0 + time * 0.02, octaves=3)
+    heat = np.clip(texture * 0.7 + granules * 0.38 + limb * 0.42 + bass * 0.18 + beat * 0.08, 0, 1)
+    dark = np.array([92, 18, 2], dtype=np.float32)
+    orange = np.array(palette[1], dtype=np.float32)
+    yellow = np.array([255, 192, 40], dtype=np.float32)
+    color = _mix_rgb(dark, orange, _smoothstep(0.18, 0.72, heat))
+    color = _mix_rgb(color, yellow, _smoothstep(0.68, 1.0, heat))
+    alpha = np.where(mask, 255 * opacity * (0.62 + intensity * 0.18), 0.0)
+    alpha += limb * 255 * opacity * (0.16 + bass * 0.12)
+    rgba = np.dstack((color, np.clip(alpha, 0, 255))).astype(np.uint8)
+    image = Image.fromarray(rgba, mode="RGBA").resize(
+        (ctx.width, ctx.height),
+        Image.Resampling.BICUBIC,
     )
+    glow = image.filter(ImageFilter.GaussianBlur(radius=max(4, ctx.height // 34)))
+    overlay.alpha_composite(glow)
+    overlay.alpha_composite(image)
+
+
+def _solar_ellipse(width: int, height: int) -> tuple[float, float, float, float]:
+    return width * 0.5, height * 1.32, width * 0.68, height * 0.82
+
+
+def _solar_limb_y(ctx: FrameContext, x: float) -> float:
+    cx, cy, rx, ry = _solar_ellipse(ctx.width, ctx.height)
+    amount = _clamp((x - cx) / rx, -0.98, 0.98)
+    return cy - ry * math.sqrt(max(0.0, 1.0 - amount * amount))
 
 
 def _draw_solar_prominences(
     ctx: FrameContext,
+    overlay: Image.Image,
     draw: ImageDraw.ImageDraw,
     palette: tuple[tuple[int, int, int], tuple[int, int, int], tuple[int, int, int]],
     opacity: float,
     intensity: float,
     bass: float,
     treble: float,
-    floor: float,
 ) -> None:
-    prominence_count = 7
-    for index in range(prominence_count):
+    del draw
+    glow = Image.new("RGBA", (ctx.width, ctx.height), (0, 0, 0, 0))
+    glow_draw = ImageDraw.Draw(glow)
+    sharp = Image.new("RGBA", (ctx.width, ctx.height), (0, 0, 0, 0))
+    sharp_draw = ImageDraw.Draw(sharp)
+    anchors = (0.16, 0.47, 0.72, 0.88)
+    for index, anchor in enumerate(anchors):
         seed = float(index) + 1.0
-        anchor = -0.08 + index / max(1, prominence_count - 1) * 1.16
-        width = ctx.width * (0.1 + _hash_scalar(seed, 4.0) * 0.15)
-        height = ctx.height * (0.15 + bass * 0.22 + intensity * 0.18)
-        height *= 0.62 + _hash_scalar(seed, 7.0) * 0.72
+        width = ctx.width * (0.13 + _hash_scalar(seed, 4.0) * 0.2)
+        height = ctx.height * (0.12 + bass * 0.18 + intensity * 0.16)
+        height *= 0.72 + _hash_scalar(seed, 7.0) * 0.9
         phase = ctx.time_seconds * (0.11 + _hash_scalar(seed, 3.0) * 0.08) + seed
-        sway = math.sin(phase) * ctx.width * (0.015 + treble * 0.012)
-        x0 = anchor * ctx.width - width * 0.35 + sway
-        x3 = x0 + width * (0.78 + _hash_scalar(seed, 8.0) * 0.52)
-        y0 = floor - ctx.height * (0.015 + _hash_scalar(seed, 6.0) * 0.035)
-        y3 = floor - ctx.height * (0.025 + _hash_scalar(seed, 9.0) * 0.045)
-        twist = math.sin(phase * 1.37) * ctx.width * 0.045
-        c1 = (x0 + width * 0.18 + twist, y0 - height * (0.84 + _hash_scalar(seed, 10.0) * 0.32))
-        c2 = (x3 - width * 0.22 - twist, y3 - height * (0.92 + _hash_scalar(seed, 11.0) * 0.42))
-        points = _cubic_points((x0, y0), c1, c2, (x3, y3), samples=42)
-        amount = index / max(1, prominence_count - 1)
+        sway = math.sin(phase) * ctx.width * (0.012 + treble * 0.01)
+        amount = index / max(1, len(anchors) - 1)
         outer = blend_color((255, 68, 18), palette[1], min(1.0, 0.35 + amount * 0.25))
         middle = blend_color((255, 168, 38), palette[2], 0.28)
         inner = blend_color((255, 238, 126), palette[2], 0.55)
-        alpha = int(255 * opacity * (0.18 + intensity * 0.28 + bass * 0.24))
-        width_outer = max(6, int(ctx.height * (0.017 + intensity * 0.018)))
-        width_mid = max(3, width_outer // 2)
-        width_inner = max(1, width_outer // 4)
-        draw.line(
-            points,
-            fill=(*outer, max(0, min(210, alpha - 18))),
-            width=width_outer,
-            joint="curve",
-        )
-        draw.line(
-            points,
-            fill=(*middle, max(0, min(240, alpha + 18))),
-            width=width_mid,
-            joint="curve",
-        )
-        draw.line(
-            points,
-            fill=(*inner, max(0, min(255, alpha + 70))),
-            width=width_inner,
-            joint="curve",
-        )
-        if index % 2 == 0:
-            filament = [
-                (x + math.sin(point_index * 0.7 + phase) * ctx.width * 0.006, y)
-                for point_index, (x, y) in enumerate(points[5:-5])
-            ]
-            draw.line(
-                filament,
-                fill=(*inner, max(0, min(160, alpha))),
-                width=max(1, width_inner - 1),
+        alpha = int(255 * opacity * (0.14 + intensity * 0.24 + bass * 0.2))
+        for strand in range(8):
+            strand_seed = seed + strand * 0.37
+            direction = -1.0 if _hash_scalar(strand_seed, 8.0) < 0.38 else 1.0
+            offset = (_hash_scalar(strand_seed, 5.0) - 0.5) * width * 0.48
+            x0 = anchor * ctx.width + sway + offset
+            x3 = x0 + direction * width * (0.25 + _hash_scalar(strand_seed, 9.0) * 0.55)
+            y0 = _solar_limb_y(ctx, x0) - ctx.height * (
+                0.004 + _hash_scalar(strand_seed, 6.0) * 0.01
+            )
+            y3 = _solar_limb_y(ctx, x3) - ctx.height * (
+                0.006 + _hash_scalar(strand_seed, 10.0) * 0.012
+            )
+            strand_height = height * (0.45 + _hash_scalar(strand_seed, 7.0) * 0.9)
+            twist = math.sin(phase * (1.1 + strand * 0.09)) * ctx.width * 0.034
+            c1 = (
+                x0 + direction * width * (0.06 + _hash_scalar(strand_seed, 11.0) * 0.18) + twist,
+                y0 - strand_height * (0.9 + _hash_scalar(strand_seed, 12.0) * 0.72),
+            )
+            c2 = (
+                x3 - direction * width * (0.08 + _hash_scalar(strand_seed, 13.0) * 0.16),
+                y3 - strand_height * (0.45 + _hash_scalar(strand_seed, 14.0) * 0.55),
+            )
+            points = _cubic_points((x0, y0), c1, c2, (x3, y3), samples=46)
+            width_outer = max(5, int(ctx.height * (0.012 + intensity * 0.011)))
+            width_inner = max(1, width_outer // 4)
+            glow_draw.line(
+                points,
+                fill=(*outer, max(0, min(98, alpha - 42))),
+                width=width_outer * 4,
                 joint="curve",
             )
+            sharp_alpha = max(0, min(155, alpha - 18 - strand * 4))
+            sharp_draw.line(
+                points,
+                fill=(*middle, sharp_alpha),
+                width=max(2, width_outer // 2),
+                joint="curve",
+            )
+            if strand in {1, 4}:
+                segment = points[6:-10]
+                sharp_draw.line(
+                    segment,
+                    fill=(*inner, max(0, min(190, alpha + 28))),
+                    width=width_inner,
+                    joint="curve",
+                )
+            if strand in {0, 3}:
+                _draw_solar_hotspot(glow_draw, palette, opacity, intensity, bass, x0, y0)
+    overlay.alpha_composite(glow.filter(ImageFilter.GaussianBlur(radius=max(5, ctx.height // 40))))
+    overlay.alpha_composite(sharp)
+
+
+def _draw_solar_hotspot(
+    draw: ImageDraw.ImageDraw,
+    palette: tuple[tuple[int, int, int], tuple[int, int, int], tuple[int, int, int]],
+    opacity: float,
+    intensity: float,
+    bass: float,
+    x: float,
+    y: float,
+) -> None:
+    radius = 4 + intensity * 10 + bass * 8
+    color = blend_color((255, 192, 36), palette[2], 0.45)
+    alpha = int(255 * opacity * (0.18 + intensity * 0.2 + bass * 0.16))
+    draw.ellipse(
+        (x - radius, y - radius * 0.7, x + radius, y + radius * 0.7),
+        fill=(*color, max(0, min(230, alpha))),
+    )
 
 
 def _cubic_points(
