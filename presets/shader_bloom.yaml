@@ -1,0 +1,64 @@
+name: shader_bloom
+version: 1
+description: Layered shader-style light fields with bloom, vortex motion, and bass-reactive orb glow.
+
+canvas:
+  background: radial_void
+  glow: true
+
+palette:
+  mode: reactive
+  base: [46, 255, 172]
+  accent: [255, 68, 164]
+  beat: [255, 248, 220]
+
+watermark:
+  enabled: true
+  text: "Christian Kajsing // kajsing.com"
+  position: bottom_right
+  opacity: 0.5
+
+modules:
+  - type: shader_field
+    id: aurora_field
+    style: aurora
+    layers: 5
+    density: 42
+    blur: 10
+    opacity: 0.72
+    intensity_feature: rms
+    bass_feature: bass_energy
+    distortion_feature: treble_energy
+  - type: shader_field
+    id: vortex_core
+    style: vortex
+    layers: 4
+    density: 52
+    blur: 4
+    opacity: 0.5
+    intensity_feature: bass_energy
+    bass_feature: bass_energy
+    distortion_feature: treble_energy
+  - type: spectrum_ring
+    id: glass_ring
+    radius:
+      base: 205
+      feature: rms
+      scale: 65
+    bars:
+      count: 160
+      height_feature: spectrum
+      scale: 150
+    rotation_speed: 0.18
+  - type: center_orb
+    id: bass_orb
+    radius:
+      base: 68
+      feature: bass_energy
+      scale: 105
+  - type: waveform_ribbon
+    id: lower_ribbon
+    position: bottom
+    height: 120
+    feature: waveform_preview
+    opacity: 0.58

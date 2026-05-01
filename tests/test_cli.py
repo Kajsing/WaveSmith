@@ -20,6 +20,7 @@ def test_list_presets_shows_builtins() -> None:
 
     assert result.exit_code == 0
     assert "neon_orb" in result.output
+    assert "shader_bloom" in result.output
     assert "spectrum_ring" in result.output
     assert "waveform_ribbon" in result.output
 

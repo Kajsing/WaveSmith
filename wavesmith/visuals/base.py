@@ -3,13 +3,14 @@
 from dataclasses import dataclass
 from typing import Any
 
-from PIL import ImageDraw
+from PIL import Image, ImageDraw
 
 
 @dataclass(frozen=True)
 class FrameContext:
     """Shared drawing context for one rendered frame."""
 
+    image: Image.Image
     draw: ImageDraw.ImageDraw
     width: int
     height: int

@@ -8,6 +8,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw
 
 from wavesmith.audio.cache import CachedAnalysis, load_or_analyze_audio
+from wavesmith.lyrics import LyricCue, active_lyric_text, load_lyrics
 from wavesmith.presets.loader import load_preset
 from wavesmith.presets.schema import PresetConfig, PresetModule
 from wavesmith.render.ffmpeg import (
@@ -23,8 +24,9 @@ from wavesmith.visuals.background import draw_reactive_background
 from wavesmith.visuals.base import FrameContext
 from wavesmith.visuals.center_orb import draw_center_orb
 from wavesmith.visuals.particles import draw_particles
+from wavesmith.visuals.shader_field import draw_shader_field
 from wavesmith.visuals.spectrum_ring import draw_spectrum_ring
-from wavesmith.visuals.text import draw_watermark
+from wavesmith.visuals.text import draw_lyrics, draw_watermark
 from wavesmith.visuals.waveform_ribbon import draw_waveform_ribbon
 
 
@@ -55,6 +57,7 @@ def render_video(options: RenderOptions) -> RenderResult:
             feature_fps=max(options.fps, 20),
         )
         timeline = Timeline(cached.analysis)
+        lyrics = load_lyrics(options.lyrics_path) if options.lyrics_path else []
 
         options.output_video.parent.mkdir(parents=True, exist_ok=True)
         command = build_rawvideo_command(
@@ -69,7 +72,13 @@ def render_video(options: RenderOptions) -> RenderResult:
         )
         encode_raw_frames(
             command=command,
-            frames=generate_reactive_frames(options, duration_seconds, timeline, preset),
+            frames=generate_reactive_frames(
+                options,
+                duration_seconds,
+                timeline,
+                preset,
+                lyrics=lyrics,
+            ),
         )
         thumbnail_path = _thumbnail_path(options)
         if thumbnail_path:
@@ -125,9 +134,11 @@ def generate_reactive_frames(
     duration_seconds: float,
     timeline: Timeline,
     preset: PresetConfig | None = None,
+    lyrics: list[LyricCue] | None = None,
 ) -> Iterator[bytes]:
     """Yield RGB frames driven by timeline features."""
     preset = preset or load_preset(options.preset)
+    lyrics = lyrics or []
     frame_count = max(1, math.ceil(duration_seconds * options.fps))
     width = options.width
     height = options.height
@@ -139,6 +150,7 @@ def generate_reactive_frames(
         image = Image.new("RGB", (width, height), (0, 0, 0))
         draw = ImageDraw.Draw(image)
         ctx = FrameContext(
+            image=image,
             draw=draw,
             width=width,
             height=height,
@@ -154,6 +166,7 @@ def generate_reactive_frames(
         draw_reactive_background(ctx)
         for module in preset.modules:
             _draw_module(ctx, module)
+        draw_lyrics(ctx, active_lyric_text(lyrics, time_seconds, options.lyrics_offset))
         draw_watermark(ctx, _watermark_text(options, preset))
 
         yield image.tobytes()
@@ -196,6 +209,8 @@ def _draw_module(ctx: FrameContext, module: PresetModule) -> None:
         draw_waveform_ribbon(ctx, module)
     elif module.type == "particles":
         draw_particles(ctx, module)
+    elif module.type == "shader_field":
+        draw_shader_field(ctx, module)
 
 
 def _watermark_text(options: RenderOptions, preset: PresetConfig) -> str | None:

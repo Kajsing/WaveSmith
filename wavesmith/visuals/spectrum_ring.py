@@ -22,14 +22,19 @@ def draw_spectrum_ring(ctx: FrameContext, module: PresetModule | None = None) ->
     configured_base = float(radius_config.get("base", 220))
     configured_scale = float(radius_config.get("scale", 40))
     bar_scale = float(bars_config.get("scale", 180))
+    bar_count = max(4, min(int(bars_config.get("count", len(spectrum))), 360))
+    rotation_speed = float(module_config.get("rotation_speed", 0.0))
     design_scale = min(ctx.width, ctx.height) / 720
     base_radius = (configured_base + configured_scale * rms) * design_scale
     max_bar = bar_scale * design_scale * (0.62 + treble * 0.38)
     width = max(1, min(ctx.width, ctx.height) // 260)
+    rotation = ctx.time_seconds * rotation_speed
 
-    for index, value in enumerate(spectrum):
-        angle = (index / len(spectrum)) * math.tau - math.pi / 2
-        mirrored_value = (value + spectrum[-index - 1]) / 2
+    for index in range(bar_count):
+        source_index = round(index / max(1, bar_count - 1) * (len(spectrum) - 1))
+        value = spectrum[source_index]
+        mirrored_value = (value + spectrum[-source_index - 1]) / 2
+        angle = (index / bar_count) * math.tau - math.pi / 2 + rotation
         bar_length = 4 + mirrored_value * max_bar
         start_radius = base_radius
         end_radius = base_radius + bar_length

@@ -26,6 +26,8 @@ class RenderOptions:
     thumbnail: bool = False
     thumbnail_at: str = "50%"
     thumbnail_path: Path | None = None
+    lyrics_path: Path | None = None
+    lyrics_offset: float = 0.0
 
 
 def parse_resolution(value: str) -> tuple[int, int]:
@@ -64,6 +66,8 @@ def build_render_options(
     thumbnail: bool = False,
     thumbnail_at: str = "50%",
     thumbnail_path: Path | None = None,
+    lyrics_path: Path | None = None,
+    lyrics_offset: float = 0.0,
 ) -> RenderOptions:
     """Validate CLI render values and return normalized options."""
     if not input_audio.exists():
@@ -76,6 +80,11 @@ def build_render_options(
         raise RenderOptionsError("FPS must be at least 1.")
     if max_seconds is not None and max_seconds <= 0:
         raise RenderOptionsError("--max-seconds must be greater than 0.")
+    if lyrics_path is not None:
+        if not lyrics_path.exists():
+            raise RenderOptionsError(f"Lyric file does not exist: {lyrics_path}")
+        if lyrics_path.suffix.lower() not in {".lrc", ".srt"}:
+            raise RenderOptionsError("Lyric file must be .lrc or .srt.")
 
     width, height = parse_resolution(resolution)
 
@@ -94,4 +103,6 @@ def build_render_options(
         thumbnail=thumbnail,
         thumbnail_at=thumbnail_at,
         thumbnail_path=thumbnail_path,
+        lyrics_path=lyrics_path,
+        lyrics_offset=lyrics_offset,
     )

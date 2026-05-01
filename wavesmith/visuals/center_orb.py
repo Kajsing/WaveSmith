@@ -2,6 +2,8 @@
 
 import math
 
+from PIL import Image, ImageDraw, ImageFilter
+
 from wavesmith.presets.schema import PresetModule
 from wavesmith.visuals.base import FrameContext, blend_color, feature_float
 
@@ -25,6 +27,7 @@ def draw_center_orb(ctx: FrameContext, module: PresetModule | None = None) -> No
 
     accent = blend_color(ctx.palette_accent, ctx.palette_beat, bass * 0.35)
     core = blend_color(ctx.palette_base, ctx.palette_accent, rms)
+    _draw_orb_glow(ctx, center_x, center_y, radius, core, accent, bass, rms)
 
     for index in range(5, 0, -1):
         ring_radius = radius + index * int(7 + rms * 10)
@@ -76,3 +79,40 @@ def draw_center_orb(ctx: FrameContext, module: PresetModule | None = None) -> No
         ),
         fill=blend_color(core, ctx.palette_beat, 0.35),
     )
+
+
+def _draw_orb_glow(
+    ctx: FrameContext,
+    center_x: int,
+    center_y: int,
+    radius: int,
+    core: tuple[int, int, int],
+    accent: tuple[int, int, int],
+    bass: float,
+    rms: float,
+) -> None:
+    glow_radius = int(radius * (1.7 + bass * 0.7))
+    if glow_radius <= 2:
+        return
+
+    overlay = Image.new("RGBA", (ctx.width, ctx.height), (0, 0, 0, 0))
+    overlay_draw = ImageDraw.Draw(overlay)
+    for index in range(4, 0, -1):
+        amount = index / 4
+        layer_radius = int(glow_radius * amount)
+        color = blend_color(core, accent, 1.0 - amount * 0.55)
+        alpha = int(80 * rms * amount + 28 * bass)
+        overlay_draw.ellipse(
+            (
+                center_x - layer_radius,
+                center_y - layer_radius,
+                center_x + layer_radius,
+                center_y + layer_radius,
+            ),
+            fill=(*color, max(0, min(120, alpha))),
+        )
+
+    blur_radius = max(2, min(ctx.width, ctx.height) // 70)
+    overlay = overlay.filter(ImageFilter.GaussianBlur(radius=blur_radius))
+    composited = Image.alpha_composite(ctx.image.convert("RGBA"), overlay)
+    ctx.image.paste(composited.convert("RGB"))

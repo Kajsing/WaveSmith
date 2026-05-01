@@ -32,6 +32,20 @@ wavesmith render song.mp3 out.mp4 --preset neon_orb --resolution 1920x1080 --fps
 wavesmith render song.mp3 preview.mp4 --preset neon_orb --resolution 640x360 --fps 15 --max-seconds 20
 ```
 
+For richer shader-style visuals, try:
+
+```bash
+wavesmith render song.mp3 shader-preview.mp4 --preset shader_bloom --resolution 640x360 --fps 15 --max-seconds 20
+```
+
+## Lyrics
+
+WaveSmith can burn timed `.lrc` or `.srt` lyrics into a render:
+
+```bash
+wavesmith render song.mp3 lyric-video.mp4 --preset shader_bloom --lyrics song.lrc --lyrics-offset 0.25
+```
+
 ## Thumbnail
 
 ```bash

@@ -4,7 +4,12 @@ from wavesmith.presets.loader import PresetError, list_builtin_presets, load_pre
 
 
 def test_builtin_presets_are_available() -> None:
-    assert list_builtin_presets() == ["neon_orb", "spectrum_ring", "waveform_ribbon"]
+    assert list_builtin_presets() == [
+        "neon_orb",
+        "shader_bloom",
+        "spectrum_ring",
+        "waveform_ribbon",
+    ]
 
 
 def test_load_builtin_preset_by_name() -> None:
@@ -15,7 +20,7 @@ def test_load_builtin_preset_by_name() -> None:
     assert preset.palette.base == (180, 80, 255)
 
 
-@pytest.mark.parametrize("name", ["neon_orb", "spectrum_ring", "waveform_ribbon"])
+@pytest.mark.parametrize("name", ["neon_orb", "shader_bloom", "spectrum_ring", "waveform_ribbon"])
 def test_all_builtin_presets_validate(name: str) -> None:
     preset = load_preset(name)
 
@@ -72,3 +77,10 @@ modules:
 
     with pytest.raises(PresetError, match="unique"):
         load_preset(preset_file)
+
+
+def test_shader_field_module_is_valid() -> None:
+    preset = load_preset("shader_bloom")
+
+    assert preset.modules[0].type == "shader_field"
+    assert preset.modules[0].model_extra["style"] == "aurora"

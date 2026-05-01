@@ -8,6 +8,7 @@ from rich.console import Console
 
 from wavesmith import __version__
 from wavesmith.audio.analyzer import DEFAULT_FEATURE_FPS, AudioAnalysisError, analyze_audio
+from wavesmith.lyrics import LyricsError
 from wavesmith.presets.loader import PresetError, list_builtin_presets, load_preset
 from wavesmith.render.batch import run_batch
 from wavesmith.render.ffmpeg import FfmpegMissingError, FfmpegRenderError
@@ -104,6 +105,14 @@ def render(
         str,
         typer.Option("--thumbnail-at", help="Thumbnail time in seconds or percent, e.g. 50%."),
     ] = "50%",
+    lyrics: Annotated[
+        Path | None,
+        typer.Option("--lyrics", help="Optional .lrc or .srt timed lyrics file."),
+    ] = None,
+    lyrics_offset: Annotated[
+        float,
+        typer.Option("--lyrics-offset", help="Shift lyric timings in seconds."),
+    ] = 0.0,
 ) -> None:
     """Render one audio file to one MP4 video."""
     try:
@@ -120,6 +129,8 @@ def render(
             force_analysis=force_analysis,
             thumbnail=thumbnail,
             thumbnail_at=thumbnail_at,
+            lyrics_path=lyrics,
+            lyrics_offset=lyrics_offset,
         )
         result = render_video(options)
     except RenderOptionsError as exc:
@@ -136,6 +147,9 @@ def render(
         raise typer.Exit(4) from exc
     except AudioAnalysisError as exc:
         console.print(f"[red]Audio analysis failed:[/red] {exc}")
+        raise typer.Exit(4) from exc
+    except LyricsError as exc:
+        console.print(f"[red]Lyrics error:[/red] {exc}")
         raise typer.Exit(4) from exc
 
     console.print(f"[green]Rendered:[/green] {output_video} ({result.duration_seconds:.2f}s)")
