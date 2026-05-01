@@ -1,0 +1,1 @@
+"""Spectrum ring visual module."""

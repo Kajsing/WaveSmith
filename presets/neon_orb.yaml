@@ -1,0 +1,40 @@
+name: neon_orb
+version: 1
+description: Neon bass orb with spectrum ring, waveform ribbon, glow, and particles.
+
+canvas:
+  background: radial_void
+  glow: true
+
+palette:
+  mode: reactive
+  base: [180, 80, 255]
+  accent: [80, 220, 255]
+  beat: [255, 255, 255]
+
+watermark:
+  enabled: true
+  text: "Christian Kajsing // kajsing.com"
+  position: bottom_right
+  opacity: 0.55
+
+modules:
+  - type: center_orb
+    id: bass_orb
+    radius:
+      base: 90
+      feature: bass_energy
+      scale: 120
+      smoothing: 0.22
+  - type: spectrum_ring
+    id: main_ring
+    radius:
+      base: 220
+      feature: rms
+      scale: 40
+  - type: waveform_ribbon
+    id: lower_ribbon
+    position: bottom
+    height: 160
+    feature: waveform_preview
+    opacity: 0.75

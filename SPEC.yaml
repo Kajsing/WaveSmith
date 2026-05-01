@@ -1,0 +1,77 @@
+project:
+  name: WaveSmith
+  version: 0.1.0
+  description: Local-first audio-reactive video generator for music visualizers.
+  target_user: Technical Windows/WSL user creating music videos from local audio files.
+
+runtime:
+  language: Python
+  python_version: ">=3.11"
+  platform:
+    - WSL2
+    - Linux
+  system_dependencies:
+    - ffmpeg
+
+requirements:
+  local_first: true
+  cloud_required: false
+  paid_api_required: false
+  gui_required_v1: false
+  input_formats_v1:
+    - mp3
+    - wav
+  output_formats_v1:
+    - mp4
+
+commands:
+  - name: render
+    purpose: Render one audio file to one video file.
+  - name: analyze
+    purpose: Analyze audio and write feature cache JSON.
+  - name: batch
+    purpose: Render multiple files from a directory.
+  - name: list-presets
+    purpose: List available visual presets.
+  - name: validate-preset
+    purpose: Validate a preset file before rendering.
+
+v1_presets:
+  - neon_orb
+  - spectrum_ring
+  - waveform_ribbon
+
+features_v1:
+  - duration_seconds
+  - sample_rate
+  - tempo_bpm
+  - beats
+  - onsets
+  - rms
+  - bass_energy
+  - mid_energy
+  - treble_energy
+  - spectrum
+  - waveform_preview
+
+non_goals_v1:
+  - gui
+  - web_app
+  - live_preview
+  - cloud_rendering
+  - ai_video_generation
+  - prompt_to_preset
+  - real_time_audio_input
+
+validation:
+  required_commands:
+    - ruff check .
+    - python -m pytest
+    - wavesmith --help
+    - wavesmith list-presets
+  smoke_render:
+    input: .tmp/test-tone.wav
+    output: .tmp/test-tone.mp4
+    max_seconds: 5
+    resolution: 640x360
+    fps: 15

@@ -1,0 +1,36 @@
+name: spectrum_ring
+version: 1
+description: Symmetrical circular spectrum visualizer with crisp frequency motion.
+
+canvas:
+  background: deep_black
+  glow: true
+
+palette:
+  mode: reactive
+  base: [40, 210, 255]
+  accent: [255, 80, 180]
+  beat: [255, 255, 255]
+
+watermark:
+  enabled: true
+  text: "Christian Kajsing // kajsing.com"
+  position: bottom_right
+  opacity: 0.5
+
+modules:
+  - type: spectrum_ring
+    id: main_ring
+    radius:
+      base: 230
+      feature: rms
+      scale: 55
+    bars:
+      count: 160
+      height_feature: spectrum
+      scale: 190
+  - type: particles
+    id: beat_sparks
+    count: 220
+    velocity_feature: treble_energy
+    burst_on: beat

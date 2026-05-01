@@ -1,0 +1,39 @@
+name: waveform_ribbon
+version: 1
+description: Flowing waveform ribbons with smooth glow and slower cinematic motion.
+
+canvas:
+  background: midnight_gradient
+  glow: true
+
+palette:
+  mode: reactive
+  base: [255, 120, 80]
+  accent: [80, 180, 255]
+  beat: [255, 245, 210]
+
+watermark:
+  enabled: true
+  text: "Christian Kajsing // kajsing.com"
+  position: bottom_right
+  opacity: 0.5
+
+modules:
+  - type: waveform_ribbon
+    id: upper_ribbon
+    position: upper
+    height: 180
+    feature: waveform_preview
+    opacity: 0.65
+  - type: waveform_ribbon
+    id: lower_ribbon
+    position: lower
+    height: 180
+    feature: waveform_preview
+    opacity: 0.85
+  - type: center_orb
+    id: pulse_orb
+    radius:
+      base: 55
+      feature: rms
+      scale: 80

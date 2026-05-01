@@ -1,0 +1,1 @@
+"""Timeline smoothing helpers."""

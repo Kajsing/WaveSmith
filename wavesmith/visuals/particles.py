@@ -1,0 +1,1 @@
+"""Particle visual module."""
