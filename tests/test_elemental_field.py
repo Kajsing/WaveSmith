@@ -76,6 +76,51 @@ def test_draw_natural_fire_behavior_changes_image() -> None:
     assert ImageChops.difference(before, image).getbbox() is not None
 
 
+def test_draw_natural_fire_accepts_line_texture() -> None:
+    image = Image.new("RGB", (160, 90), (0, 0, 0))
+    before = image.copy()
+    ctx = FrameContext(
+        image=image,
+        draw=ImageDraw.Draw(image),
+        width=160,
+        height=90,
+        time_seconds=3.0,
+        progress=0.5,
+        features={
+            "rms": 0.4,
+            "bass_energy": 0.5,
+            "slow_bass": 0.62,
+            "slow_mid": 0.35,
+            "slow_pulse": 0.78,
+            "beat_decay": 0.45,
+            "tempo_bpm": 92.0,
+            "treble_energy": 0.25,
+            "beat": False,
+        },
+        preset_name="test",
+        palette_base=(255, 44, 18),
+        palette_accent=(255, 118, 20),
+        palette_beat=(255, 230, 92),
+    )
+    module = PresetModule(
+        type="elemental_field",
+        id="textured_fire",
+        element="fire",
+        behavior="natural",
+        line_texture="filament",
+        density=20,
+        bands=3,
+        opacity=0.8,
+        intensity_feature="slow_pulse",
+        bass_feature="slow_bass",
+        motion_feature="slow_mid",
+    )
+
+    draw_elemental_field(ctx, module)
+
+    assert ImageChops.difference(before, image).getbbox() is not None
+
+
 def test_draw_lightning_element_changes_image() -> None:
     image = Image.new("RGB", (160, 90), (0, 0, 0))
     before = image.copy()

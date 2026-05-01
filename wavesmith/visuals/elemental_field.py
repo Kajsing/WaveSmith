@@ -18,6 +18,9 @@ def draw_elemental_field(ctx: FrameContext, module: PresetModule | None = None) 
     bands = max(1, min(int(module_config.get("bands", 5)), 10))
     blur = max(0.0, min(float(module_config.get("blur", 5)), 20.0))
     behavior = str(module_config.get("behavior", module_config.get("fire_behavior", "dream")))
+    line_texture = str(
+        module_config.get("line_texture", module_config.get("prominence_texture", "plasma"))
+    )
     intensity = feature_float(ctx.features, str(module_config.get("intensity_feature", "rms")))
     bass = feature_float(ctx.features, str(module_config.get("bass_feature", "bass_energy")))
     treble = feature_float(ctx.features, str(module_config.get("motion_feature", "treble_energy")))
@@ -40,6 +43,7 @@ def draw_elemental_field(ctx: FrameContext, module: PresetModule | None = None) 
             treble,
             beat,
             behavior.lower(),
+            line_texture.lower(),
         )
     elif element == "water":
         _draw_water(ctx, draw, palette, bands, density, opacity, intensity, bass, treble, beat)
@@ -71,6 +75,7 @@ def _draw_fire(
     treble: float,
     beat: float,
     behavior: str,
+    line_texture: str,
 ) -> None:
     _draw_fire_density_field(
         ctx, overlay, palette, opacity, intensity, bass, treble, beat, behavior
@@ -78,7 +83,9 @@ def _draw_fire(
     floor = ctx.height * (0.93 - beat * 0.05)
     if behavior in {"natural", "realistic", "normal"}:
         _draw_solar_surface(ctx, overlay, palette, opacity, intensity, bass, beat)
-        _draw_solar_prominences(ctx, overlay, draw, palette, opacity, intensity, bass, treble)
+        _draw_solar_prominences(
+            ctx, overlay, draw, palette, opacity, intensity, bass, treble, line_texture
+        )
     else:
         flame_height = ctx.height * (0.42 + bass * 0.28 + beat * 0.18)
         for band in range(bands):
@@ -246,6 +253,7 @@ def _draw_solar_prominences(
     intensity: float,
     bass: float,
     treble: float,
+    line_texture: str,
 ) -> None:
     del draw
     glow = Image.new("RGBA", (ctx.width, ctx.height), (0, 0, 0, 0))
@@ -303,26 +311,39 @@ def _draw_solar_prominences(
             points = _cubic_points((x0, y0), c1, c2, (x3, y3), samples=46)
             width_outer = max(4, int(ctx.height * (0.009 + intensity * 0.01)))
             width_inner = max(1, width_outer // 4)
-            glow_draw.line(
+            _draw_textured_polyline(
+                glow_draw,
                 points,
-                fill=(*outer, max(0, min(120, int((alpha - 24) * strand_activation)))),
-                width=width_outer * 4,
-                joint="curve",
+                outer,
+                max(0, min(120, int((alpha - 24) * strand_activation))),
+                width_outer * 4,
+                line_texture,
+                strand_seed,
+                ctx.time_seconds,
+                soft=True,
             )
             sharp_alpha = max(0, min(180, int((alpha + 4 - strand * 3) * strand_activation)))
-            sharp_draw.line(
+            _draw_textured_polyline(
+                sharp_draw,
                 points,
-                fill=(*middle, sharp_alpha),
-                width=max(2, width_outer // 2),
-                joint="curve",
+                middle,
+                sharp_alpha,
+                max(2, width_outer // 2),
+                line_texture,
+                strand_seed + 21.0,
+                ctx.time_seconds,
             )
             if strand in {1, 4}:
                 segment = points[6:-10]
-                sharp_draw.line(
+                _draw_textured_polyline(
+                    sharp_draw,
                     segment,
-                    fill=(*inner, max(0, min(190, alpha + 28))),
-                    width=width_inner,
-                    joint="curve",
+                    inner,
+                    max(0, min(190, alpha + 28)),
+                    width_inner,
+                    line_texture,
+                    strand_seed + 42.0,
+                    ctx.time_seconds,
                 )
             if strand in {0, 3} and activation > 0.32:
                 _draw_solar_hotspot(
@@ -351,6 +372,66 @@ def _music_region_envelope(ctx: FrameContext, index: int) -> float:
     slow_pulse = feature_float(ctx.features, "slow_pulse")
     beat_decay = feature_float(ctx.features, "beat_decay")
     return _clamp(gate * (0.38 + slow_pulse * 0.72) + beat_decay * 0.24, 0.0, 1.0)
+
+
+def _draw_textured_polyline(
+    draw: ImageDraw.ImageDraw,
+    points: list[tuple[float, float]],
+    color: tuple[int, int, int],
+    alpha: int,
+    width: int,
+    texture: str,
+    seed: float,
+    time_seconds: float,
+    *,
+    soft: bool = False,
+) -> None:
+    if len(points) < 2 or alpha <= 0 or width <= 0:
+        return
+    if texture in {"", "none", "smooth", "solid"}:
+        draw.line(points, fill=(*color, alpha), width=width, joint="curve")
+        return
+
+    distances = _polyline_distances(points)
+    total = max(0.0001, distances[-1])
+    for index, (start, end) in enumerate(zip(points, points[1:], strict=False)):
+        amount = ((distances[index] + distances[index + 1]) * 0.5) / total
+        modulation = _line_texture_amount(texture, seed, amount, time_seconds, soft)
+        if modulation <= 0.02:
+            continue
+        segment_alpha = max(0, min(255, int(alpha * modulation)))
+        if segment_alpha <= 0:
+            continue
+        segment_width = max(1, int(round(width * (0.72 + modulation * 0.42))))
+        draw.line((start, end), fill=(*color, segment_alpha), width=segment_width)
+
+
+def _polyline_distances(points: list[tuple[float, float]]) -> list[float]:
+    distances = [0.0]
+    for start, end in zip(points, points[1:], strict=False):
+        distances.append(distances[-1] + math.dist(start, end))
+    return distances
+
+
+def _line_texture_amount(
+    texture: str,
+    seed: float,
+    amount: float,
+    time_seconds: float,
+    soft: bool,
+) -> float:
+    noise = _hash_scalar(math.floor(amount * 32.0) + seed * 11.0, seed + 3.0)
+    fine = _hash_scalar(math.floor(amount * 93.0) + seed * 17.0, seed + 8.0)
+    wave = 0.5 + 0.5 * math.sin(amount * math.tau * (5.0 + seed % 3.0) - time_seconds * 0.7)
+    if texture == "filament":
+        value = 0.22 + wave * 0.34 + noise * 0.34 + fine * 0.18
+    elif texture == "grain":
+        value = 0.28 + noise * 0.5 + fine * 0.22
+    else:
+        value = 0.34 + wave * 0.22 + noise * 0.32 + fine * 0.18
+    if soft:
+        value = 0.42 + value * 0.58
+    return _clamp(value, 0.0, 1.0)
 
 
 def _draw_solar_hotspot(

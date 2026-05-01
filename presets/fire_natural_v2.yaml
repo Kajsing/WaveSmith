@@ -23,6 +23,7 @@ modules:
     id: natural_fire
     element: fire
     behavior: natural
+    line_texture: plasma
     density: 84
     bands: 5
     blur: 5
