@@ -1,0 +1,38 @@
+name: earth_surface_spikes
+version: 1
+description: Living earth surface with fine moss-like audio-reactive green spikes.
+
+canvas:
+  background: radial_void
+  glow: true
+
+palette:
+  mode: reactive
+  base: [74, 214, 82]
+  accent: [46, 118, 42]
+  beat: [220, 244, 132]
+
+watermark:
+  enabled: true
+  text: "Christian Kajsing // kajsing.com"
+  position: bottom_right
+  opacity: 0.5
+
+modules:
+  - type: cinematic_backdrop
+    id: earth_stage
+    darkness: 0.9
+    haze: 0.24
+  - type: elemental_field
+    id: earth_surface
+    element: earth
+    behavior: surface
+    line_texture: grain
+    measurement_points: 360
+    density: 96
+    bands: 7
+    blur: 3
+    opacity: 0.86
+    intensity_feature: slow_pulse
+    bass_feature: slow_bass
+    motion_feature: treble_energy

@@ -77,6 +77,23 @@ def draw_elemental_field(ctx: FrameContext, module: PresetModule | None = None) 
             measurement_points,
             crack_points,
         )
+    elif element == "earth":
+        _draw_earth(
+            ctx,
+            overlay,
+            draw,
+            palette,
+            bands,
+            density,
+            opacity,
+            intensity,
+            bass,
+            treble,
+            beat,
+            behavior.lower(),
+            line_texture.lower(),
+            measurement_points,
+        )
     elif element == "lightning":
         _draw_lightning(ctx, draw, palette, bands, density, opacity, intensity, bass, treble, beat)
     else:
@@ -892,6 +909,318 @@ def _draw_ice(
         draw.line((*start, *end), fill=color, width=max(1, ctx.height // 110))
 
 
+def _draw_earth(
+    ctx: FrameContext,
+    overlay: Image.Image,
+    draw: ImageDraw.ImageDraw,
+    palette: tuple[tuple[int, int, int], tuple[int, int, int], tuple[int, int, int]],
+    bands: int,
+    density: int,
+    opacity: float,
+    intensity: float,
+    bass: float,
+    treble: float,
+    beat: float,
+    behavior: str,
+    line_texture: str,
+    measurement_points: int,
+) -> None:
+    if behavior in {"orb", "planet", "ring", "center"}:
+        _draw_earth_orb_ring(
+            ctx,
+            overlay,
+            palette,
+            bands,
+            density,
+            opacity,
+            intensity,
+            bass,
+            treble,
+            beat,
+            line_texture,
+            measurement_points,
+        )
+        return
+    _draw_earth_surface(
+        ctx,
+        overlay,
+        palette,
+        bands,
+        density,
+        opacity,
+        intensity,
+        bass,
+        treble,
+        beat,
+        line_texture,
+        measurement_points,
+    )
+
+
+def _draw_earth_surface(
+    ctx: FrameContext,
+    overlay: Image.Image,
+    palette: tuple[tuple[int, int, int], tuple[int, int, int], tuple[int, int, int]],
+    bands: int,
+    density: int,
+    opacity: float,
+    intensity: float,
+    bass: float,
+    treble: float,
+    beat: float,
+    line_texture: str,
+    measurement_points: int,
+) -> None:
+    surface = Image.new("RGBA", (ctx.width, ctx.height), (0, 0, 0, 0))
+    _draw_earth_terrain_field(ctx, surface, palette, opacity, intensity, bass, beat)
+    glow = Image.new("RGBA", (ctx.width, ctx.height), (0, 0, 0, 0))
+    glow_draw = ImageDraw.Draw(glow)
+    sharp = Image.new("RGBA", (ctx.width, ctx.height), (0, 0, 0, 0))
+    sharp_draw = ImageDraw.Draw(sharp)
+    points = measurement_points or density * 3
+    points = max(96, min(512, points))
+    spectrum = feature_vector(ctx.features, "spectrum")
+    for index in range(points):
+        amount = index / max(1, points - 1)
+        seed = index + 31.0
+        x = amount * ctx.width
+        ground_y = _earth_surface_y(ctx, amount)
+        value = _sample_vector(spectrum, amount, intensity)
+        local = 0.54 + _hash_scalar(seed, 4.0) * 0.72
+        height = ctx.height * (0.014 + value * 0.055 + bass * 0.022 + beat * 0.018) * local
+        lean = math.sin(seed * 1.7 + ctx.time_seconds * (0.35 + treble)) * ctx.width * 0.0025
+        tip = (x + lean, ground_y - height)
+        base = (x, ground_y + ctx.height * 0.004)
+        alpha = int(255 * opacity * (0.07 + value * 0.22 + intensity * 0.1))
+        width = max(1, int(ctx.width / 700))
+        spike_color = blend_color(palette[0], palette[2], 0.2 + value * 0.45 + beat * 0.12)
+        _draw_textured_polyline(
+            glow_draw,
+            [base, tip],
+            palette[1],
+            max(0, min(90, alpha)),
+            width * 4,
+            line_texture,
+            seed * 17.0,
+            ctx.time_seconds * 0.6,
+            soft=True,
+        )
+        _draw_textured_polyline(
+            sharp_draw,
+            [base, tip],
+            spike_color,
+            max(0, min(185, alpha + 26)),
+            width,
+            line_texture,
+            seed * 23.0,
+            ctx.time_seconds * (0.5 + treble),
+        )
+        if index % max(10, bands * 2) == 0:
+            _draw_earth_seed_glint(sharp_draw, palette, opacity, value, beat, tip, seed)
+    overlay.alpha_composite(surface)
+    overlay.alpha_composite(glow.filter(ImageFilter.GaussianBlur(radius=max(2, ctx.height // 75))))
+    overlay.alpha_composite(sharp)
+
+
+def _draw_earth_terrain_field(
+    ctx: FrameContext,
+    overlay: Image.Image,
+    palette: tuple[tuple[int, int, int], tuple[int, int, int], tuple[int, int, int]],
+    opacity: float,
+    intensity: float,
+    bass: float,
+    beat: float,
+) -> None:
+    field_width = max(160, min(360, ctx.width // 2))
+    field_height = max(90, min(220, ctx.height // 2))
+    x = np.linspace(0.0, 1.0, field_width, dtype=np.float32)
+    y = np.linspace(0.0, 1.0, field_height, dtype=np.float32)
+    xx, yy = np.meshgrid(x, y)
+    time = np.float32(ctx.time_seconds)
+    curve = 0.38 + 0.23 * ((xx - 0.5) ** 2) + bass * 0.025
+    mask = _smoothstep(curve, curve + 0.08, yy)
+    loam = _fbm(xx * 8.0 + time * 0.01, yy * 5.5 - time * 0.006, octaves=5)
+    moss = _fbm(xx * 26.0 - time * 0.03, yy * 18.0 + time * 0.014, octaves=3)
+    growth = np.clip(loam * 0.5 + moss * 0.32 + intensity * 0.14 + beat * 0.06, 0, 1)
+    soil = np.array([18, 15, 8], dtype=np.float32)
+    deep_green = np.array([16, 72, 35], dtype=np.float32)
+    moss_green = np.array(palette[0], dtype=np.float32)
+    color = _mix_rgb(soil, deep_green, _smoothstep(0.16, 0.62, growth))
+    color = _mix_rgb(color, moss_green, _smoothstep(0.58, 1.0, growth))
+    alpha = mask * 255 * opacity * (0.58 + bass * 0.12)
+    rgba = np.dstack((color, np.clip(alpha, 0, 235))).astype(np.uint8)
+    image = Image.fromarray(rgba, mode="RGBA").resize(
+        (ctx.width, ctx.height),
+        Image.Resampling.BICUBIC,
+    )
+    overlay.alpha_composite(image)
+
+
+def _earth_surface_y(ctx: FrameContext, amount: float) -> float:
+    curve = (amount - 0.5) ** 2
+    ripple = math.sin(amount * math.tau * 3.0 + ctx.time_seconds * 0.16) * ctx.height * 0.006
+    return ctx.height * (0.58 + curve * 0.22) + ripple
+
+
+def _draw_earth_seed_glint(
+    draw: ImageDraw.ImageDraw,
+    palette: tuple[tuple[int, int, int], tuple[int, int, int], tuple[int, int, int]],
+    opacity: float,
+    value: float,
+    beat: float,
+    position: tuple[float, float],
+    seed: float,
+) -> None:
+    if value < 0.68 and beat < 0.5:
+        return
+    radius = 0.6 + value * 1.35 + beat * 0.75 + _hash_scalar(seed, 2.0) * 0.5
+    alpha = int(255 * opacity * (0.06 + value * 0.1 + beat * 0.05))
+    color = blend_color(palette[1], palette[2], 0.45 + value * 0.3)
+    draw.ellipse(
+        (
+            position[0] - radius,
+            position[1] - radius,
+            position[0] + radius,
+            position[1] + radius,
+        ),
+        fill=(*color, max(0, min(190, alpha))),
+    )
+
+
+def _draw_earth_orb_ring(
+    ctx: FrameContext,
+    overlay: Image.Image,
+    palette: tuple[tuple[int, int, int], tuple[int, int, int], tuple[int, int, int]],
+    bands: int,
+    density: int,
+    opacity: float,
+    intensity: float,
+    bass: float,
+    treble: float,
+    beat: float,
+    line_texture: str,
+    measurement_points: int,
+) -> None:
+    center = (ctx.width * 0.5, ctx.height * 0.5)
+    radius = min(ctx.width, ctx.height) * (0.235 + bass * 0.025 + beat * 0.015)
+    _draw_earth_orb_body(ctx, overlay, palette, center, radius, opacity, intensity, bass, beat)
+    glow = Image.new("RGBA", (ctx.width, ctx.height), (0, 0, 0, 0))
+    glow_draw = ImageDraw.Draw(glow)
+    sharp = Image.new("RGBA", (ctx.width, ctx.height), (0, 0, 0, 0))
+    sharp_draw = ImageDraw.Draw(sharp)
+    points = measurement_points or density * 4
+    points = max(144, min(512, points))
+    spectrum = feature_vector(ctx.features, "spectrum")
+    for index in range(points):
+        amount = index / points
+        angle = amount * math.tau - math.pi / 2
+        value = _sample_vector(spectrum, amount, intensity)
+        seed = index + 61.0
+        noise = 0.72 + _hash_scalar(seed, 4.0) * 0.54
+        growth = ctx.height * (0.012 + value * 0.052 + bass * 0.018 + beat * 0.014) * noise
+        start_radius = radius * (1.02 + math.sin(index * 0.17 + ctx.time_seconds * 0.4) * 0.012)
+        end_radius = start_radius + growth
+        start = (
+            center[0] + math.cos(angle) * start_radius,
+            center[1] + math.sin(angle) * start_radius,
+        )
+        end = (
+            center[0] + math.cos(angle) * end_radius,
+            center[1] + math.sin(angle) * end_radius,
+        )
+        alpha = int(255 * opacity * (0.08 + value * 0.2 + treble * 0.08))
+        color = blend_color(palette[0], palette[2], 0.25 + value * 0.45 + beat * 0.08)
+        width = max(1, int(ctx.width / 800))
+        _draw_textured_polyline(
+            glow_draw,
+            [start, end],
+            palette[1],
+            max(0, min(85, alpha)),
+            width * 4,
+            line_texture,
+            seed * 19.0,
+            ctx.time_seconds * 0.65,
+            soft=True,
+        )
+        _draw_textured_polyline(
+            sharp_draw,
+            [start, end],
+            color,
+            max(0, min(185, alpha + 22)),
+            width,
+            line_texture,
+            seed * 29.0,
+            ctx.time_seconds * (0.4 + treble),
+        )
+        if index % max(12, bands * 2) == 0:
+            _draw_earth_seed_glint(sharp_draw, palette, opacity, value, beat, end, seed)
+    ring_width = max(1, ctx.height // 170)
+    for ring in range(3):
+        inset = ring * ctx.height * 0.018
+        alpha = int(255 * opacity * (0.08 + intensity * 0.06 + beat * 0.04) / (ring + 1))
+        sharp_draw.ellipse(
+            (
+                center[0] - radius - inset,
+                center[1] - radius - inset,
+                center[0] + radius + inset,
+                center[1] + radius + inset,
+            ),
+            outline=(*blend_color(palette[0], palette[2], ring * 0.24), alpha),
+            width=ring_width,
+        )
+    overlay.alpha_composite(glow.filter(ImageFilter.GaussianBlur(radius=max(3, ctx.height // 70))))
+    overlay.alpha_composite(sharp)
+
+
+def _draw_earth_orb_body(
+    ctx: FrameContext,
+    overlay: Image.Image,
+    palette: tuple[tuple[int, int, int], tuple[int, int, int], tuple[int, int, int]],
+    center: tuple[float, float],
+    radius: float,
+    opacity: float,
+    intensity: float,
+    bass: float,
+    beat: float,
+) -> None:
+    halo = Image.new("RGBA", (ctx.width, ctx.height), (0, 0, 0, 0))
+    halo_draw = ImageDraw.Draw(halo)
+    halo_alpha = int(255 * opacity * (0.08 + bass * 0.05 + beat * 0.04))
+    halo_draw.ellipse(
+        (
+            center[0] - radius * 1.34,
+            center[1] - radius * 1.34,
+            center[0] + radius * 1.34,
+            center[1] + radius * 1.34,
+        ),
+        fill=(*palette[0], max(0, min(80, halo_alpha))),
+    )
+    overlay.alpha_composite(halo.filter(ImageFilter.GaussianBlur(radius=max(8, ctx.height // 24))))
+    field_size = max(96, min(240, int(radius * 2.4)))
+    coords = np.linspace(-1.0, 1.0, field_size, dtype=np.float32)
+    xx, yy = np.meshgrid(coords, coords)
+    rr = np.sqrt(xx * xx + yy * yy)
+    mask = 1.0 - _smoothstep(0.78, 1.0, rr)
+    time = np.float32(ctx.time_seconds)
+    continents = _fbm(xx * 2.7 + time * 0.02, yy * 2.1 - time * 0.012, octaves=5)
+    ridges = _fbm(xx * 12.0 - time * 0.025, yy * 9.5 + time * 0.01, octaves=3)
+    land = np.clip(continents * 0.7 + ridges * 0.18 + bass * 0.08, 0, 1)
+    shade = np.clip(1.0 - rr * 0.55 + (xx * -0.18 + yy * -0.12), 0, 1)
+    dark = np.array([6, 18, 10], dtype=np.float32)
+    soil = np.array([55, 45, 20], dtype=np.float32)
+    green = np.array(palette[0], dtype=np.float32)
+    color = _mix_rgb(dark, soil, _smoothstep(0.18, 0.54, land))
+    color = _mix_rgb(color, green, _smoothstep(0.5, 1.0, land))
+    color *= (0.52 + shade[..., None] * 0.62 + intensity * 0.05 + beat * 0.04)
+    alpha = mask * 255 * opacity * (0.7 + bass * 0.08)
+    rgba = np.dstack((np.clip(color, 0, 255), np.clip(alpha, 0, 245))).astype(np.uint8)
+    image = Image.fromarray(rgba, mode="RGBA").resize(
+        (int(radius * 2), int(radius * 2)),
+        Image.Resampling.BICUBIC,
+    )
+    overlay.alpha_composite(image, (int(center[0] - radius), int(center[1] - radius)))
+
+
 def _draw_cracked_ice_sheet(
     ctx: FrameContext,
     overlay: Image.Image,
@@ -1259,6 +1588,8 @@ def _element_palette(
         return ((20, 150, 255), ctx.palette_base, (190, 245, 255))
     if element == "ice":
         return ((150, 235, 255), ctx.palette_beat, ctx.palette_accent)
+    if element == "earth":
+        return ((92, 224, 90), (53, 132, 55), (218, 244, 132))
     if element == "lightning":
         return (ctx.palette_beat, (120, 235, 255), ctx.palette_accent)
     return (ctx.palette_base, ctx.palette_accent, ctx.palette_beat)

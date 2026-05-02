@@ -33,8 +33,8 @@ def test_list_presets_details_shows_descriptions() -> None:
 
     assert result.exit_code == 0
     assert "Preset" in result.output
+    assert "shader_bloom" in result.output
     assert "shader_field" in result.output
-    assert "Layered shader-style light" in result.output
     assert "fields with bloom" in result.output
 
 

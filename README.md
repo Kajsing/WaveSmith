@@ -58,6 +58,13 @@ For a cinematic portal/waveform look inspired by fire visualizer posters:
 wavesmith render song.mp3 inferno-preview.mp4 --preset inferno_portal --resolution 640x360 --fps 15 --max-seconds 20
 ```
 
+For organic earth visuals with fine audio-reactive growth spikes:
+
+```bash
+wavesmith preview song.mp3 earth-surface.mp4 --preset earth_surface_spikes
+wavesmith preview song.mp3 earth-orb.mp4 --preset earth_orb_spikes
+```
+
 Advanced presets can also use a local image as a cinematic backdrop with the `image_backdrop`
 module. This keeps the workflow local while allowing generated or hand-made style frames to drive
 the look.

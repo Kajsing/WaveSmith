@@ -1,0 +1,38 @@
+name: earth_orb_spikes
+version: 1
+description: Center earth orb with a fine audio-reactive organic spike halo.
+
+canvas:
+  background: radial_void
+  glow: true
+
+palette:
+  mode: reactive
+  base: [72, 216, 86]
+  accent: [42, 118, 52]
+  beat: [226, 246, 142]
+
+watermark:
+  enabled: true
+  text: "Christian Kajsing // kajsing.com"
+  position: bottom_right
+  opacity: 0.5
+
+modules:
+  - type: cinematic_backdrop
+    id: earth_stage
+    darkness: 0.92
+    haze: 0.26
+  - type: elemental_field
+    id: earth_orb
+    element: earth
+    behavior: orb
+    line_texture: filament
+    measurement_points: 420
+    density: 98
+    bands: 8
+    blur: 3
+    opacity: 0.88
+    intensity_feature: slow_pulse
+    bass_feature: slow_bass
+    motion_feature: treble_energy

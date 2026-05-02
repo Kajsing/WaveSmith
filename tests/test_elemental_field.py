@@ -248,6 +248,51 @@ def test_draw_cracked_ice_sheet_behavior_changes_image() -> None:
     assert ImageChops.difference(before, image).getbbox() is not None
 
 
+def test_draw_earth_surface_and_orb_behaviors_change_image() -> None:
+    for behavior in ("surface", "orb"):
+        image = Image.new("RGB", (160, 90), (0, 0, 0))
+        before = image.copy()
+        ctx = FrameContext(
+            image=image,
+            draw=ImageDraw.Draw(image),
+            width=160,
+            height=90,
+            time_seconds=2.2,
+            progress=0.4,
+            features={
+                "rms": 0.45,
+                "bass_energy": 0.58,
+                "slow_bass": 0.62,
+                "slow_pulse": 0.7,
+                "treble_energy": 0.68,
+                "spectrum": [0.1, 0.4, 0.8, 0.3, 0.65, 0.25, 0.5, 0.9],
+                "beat": True,
+            },
+            preset_name="test",
+            palette_base=(72, 216, 86),
+            palette_accent=(42, 118, 52),
+            palette_beat=(226, 246, 142),
+        )
+        module = PresetModule(
+            type="elemental_field",
+            id=f"earth_{behavior}",
+            element="earth",
+            behavior=behavior,
+            line_texture="grain",
+            measurement_points=96,
+            density=40,
+            bands=4,
+            opacity=0.84,
+            intensity_feature="slow_pulse",
+            bass_feature="slow_bass",
+            motion_feature="treble_energy",
+        )
+
+        draw_elemental_field(ctx, module)
+
+        assert ImageChops.difference(before, image).getbbox() is not None
+
+
 def test_draw_lightning_element_changes_image() -> None:
     image = Image.new("RGB", (160, 90), (0, 0, 0))
     before = image.copy()

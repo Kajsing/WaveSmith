@@ -5,6 +5,8 @@ from wavesmith.presets.loader import PresetError, list_builtin_presets, load_pre
 
 def test_builtin_presets_are_available() -> None:
     assert list_builtin_presets() == [
+        "earth_orb_spikes",
+        "earth_surface_spikes",
         "elemental_storm",
         "fire_dual_lines",
         "fire_natural_v2",
@@ -28,6 +30,8 @@ def test_load_builtin_preset_by_name() -> None:
 @pytest.mark.parametrize(
     "name",
     [
+        "earth_orb_spikes",
+        "earth_surface_spikes",
         "elemental_storm",
         "fire_dual_lines",
         "fire_natural_v2",
