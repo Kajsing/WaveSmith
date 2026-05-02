@@ -1,0 +1,39 @@
+name: gpu_crystal_storm
+version: 1
+description: Experimental GPU crystal storm shader with radial shards, fractures, and beat bloom.
+
+metadata:
+  family: shader
+  tags: [crystal, experimental, gpu, shader, storm]
+
+canvas:
+  background: cosmic_crystal
+  glow: true
+
+palette:
+  mode: reactive
+  base: [72, 88, 255]
+  accent: [236, 70, 255]
+  beat: [255, 214, 148]
+
+watermark:
+  enabled: true
+  text: "Christian Kajsing // kajsing.com"
+  position: bottom_right
+  opacity: 0.5
+
+modules:
+  - type: shader_field
+    id: gpu_crystal
+    style: gpu_crystal
+    shader: crystal_storm
+    opacity: 1.0
+    detail: 0.82
+    bloom_strength: 1.08
+    warp_strength: 0.7
+    line_strength: 0.74
+    exposure: 1.18
+    softness: 0.82
+    intensity_feature: rms
+    bass_feature: bass_energy
+    distortion_feature: treble_energy

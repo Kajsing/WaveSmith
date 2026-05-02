@@ -457,3 +457,27 @@ test -s .tmp/m6-batch-out/batch-summary.json
 - GPU preview render succeeded on the local RTX 3080 Ti WSL setup.
 - Render output and thumbnails were written under `.tmp/` and `.renders/`, not committed.
 - Full validation passed.
+
+## 2026-05-02 - Second GPU Shader Preset
+
+### Changed
+
+- Generalized the GPU shader loader so bundled presets can select different safe `.glsl` shader
+  names.
+- Added `gpu_crystal_storm`, a second GPU-first preset using the existing uniform contract.
+- Added `crystal_storm.glsl` with radial shards, fracture lines, spectrum sparkle, and beat bloom.
+- Added tests for the new preset and shader-loader rejection of unknown or unsafe shader names.
+
+### Validation Run
+
+```bash
+.venv/bin/wavesmith preview .tmp/music/Low\ Under-Skin.mp3 .tmp/music/gpu-crystal-storm-preview-v2.mp4 --backend gpu --preset gpu_crystal_storm --seconds 10 --fps 30 --thumbnail-at best --crf 12 --ffmpeg-preset slow --watermark ""
+.venv/bin/ruff check .
+.venv/bin/python -m pytest
+```
+
+### Result
+
+- GPU crystal storm preview rendered successfully on the local RTX 3080 Ti WSL setup.
+- Render output and thumbnails were written under `.tmp/` and `.renders/`, not committed.
+- Full validation passed.

@@ -107,6 +107,17 @@ def test_gpu_uniforms_prepare_audio_features() -> None:
     assert program["u_softness"].value == 1.0
 
 
+def test_gpu_shader_loader_rejects_unknown_or_unsafe_names() -> None:
+    from wavesmith.gpu.renderer import _load_shader_source
+
+    assert "#version" in _load_shader_source("bloom_field")
+    assert "#version" in _load_shader_source("crystal_storm")
+    with pytest.raises(RuntimeError, match="Unsupported GPU shader"):
+        _load_shader_source("../bloom_field")
+    with pytest.raises(RuntimeError, match="Unsupported GPU shader"):
+        _load_shader_source("missing_shader")
+
+
 def test_gpu_backend_smoke_renders_tiny_frames() -> None:
     pytest.importorskip("moderngl")
     options = RenderOptions(

@@ -100,17 +100,23 @@ def generate_gpu_frames(
 
 def _gpu_shader_module(preset: PresetConfig) -> PresetModule:
     for module in preset.modules:
-        if module.type == "shader_field" and module.model_extra.get("style") == "gpu_bloom":
+        style = str(module.model_extra.get("style", ""))
+        if module.type == "shader_field" and (
+            style.startswith("gpu_") or "shader" in module.model_extra
+        ):
             return module
     raise RuntimeError(
-        f"Preset '{preset.name}' does not declare a shader_field module with style gpu_bloom."
+        f"Preset '{preset.name}' does not declare a GPU shader_field module."
     )
 
 
 def _load_shader_source(shader_name: str) -> str:
-    if shader_name != "bloom_field":
+    if not shader_name.replace("_", "").isalnum():
         raise RuntimeError(f"Unsupported GPU shader: {shader_name}")
-    return (files("wavesmith.gpu.shaders") / "bloom_field.glsl").read_text(encoding="utf-8")
+    shader_path = files("wavesmith.gpu.shaders") / f"{shader_name}.glsl"
+    if not shader_path.is_file():
+        raise RuntimeError(f"Unsupported GPU shader: {shader_name}")
+    return shader_path.read_text(encoding="utf-8")
 
 
 def _set_uniforms(

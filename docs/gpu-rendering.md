@@ -20,6 +20,9 @@ wavesmith gpu-info
 warp, bloom-like glow, palette mixing, and 32-bin spectrum reactivity. It is intentionally not a
 port of the CPU presets.
 
+`gpu_crystal_storm` is the second GPU-first preset. It uses the same uniform contract, but targets a
+crystal/fracture visual language with radial shards, spectrum-driven sparkle, and beat bloom.
+
 The preset exposes shader quality controls through module fields:
 
 - `detail`
@@ -65,6 +68,8 @@ On May 2, 2026, the bloom shader was softened to reduce large block-like field a
 - kept fine noise mostly as subtle grain rather than a strong color driver;
 - added preset-level tuning knobs for bloom, warp, line, exposure, softness, and detail;
 - switched the GPU fullscreen primitive from a quad to one oversized triangle.
+- generalized shader loading so built-in GPU presets can select other bundled `.glsl` shaders
+  without opening arbitrary file paths.
 
 High-quality local comparison render:
 
@@ -74,3 +79,9 @@ wavesmith preview .tmp/music/Low\ Under-Skin.mp3 .tmp/music/gpu-bloom-preview-qu
 
 For quick previews, the default CRF remains fine. For visual inspection of glow-heavy GPU shaders,
 use a lower CRF such as `--crf 12`.
+
+Crystal storm comparison render:
+
+```bash
+wavesmith preview .tmp/music/Low\ Under-Skin.mp3 .tmp/music/gpu-crystal-storm-preview-v2.mp4 --backend gpu --preset gpu_crystal_storm --seconds 10 --fps 30 --thumbnail-at best --crf 12 --ffmpeg-preset slow --watermark ""
+```
