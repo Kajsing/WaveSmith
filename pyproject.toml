@@ -28,12 +28,17 @@ dev = [
   "pytest>=8",
   "ruff>=0.5",
 ]
+gpu = [
+  "glcontext>=2.5",
+  "moderngl>=5.10",
+]
 
 [project.scripts]
 wavesmith = "wavesmith.cli:app"
 
 [tool.hatch.build.targets.wheel]
 packages = ["wavesmith"]
+artifacts = ["wavesmith/gpu/shaders/*.glsl"]
 
 [tool.ruff]
 line-length = 100

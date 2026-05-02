@@ -13,6 +13,7 @@ from wavesmith import __version__
 from wavesmith.ai import build_ai_prompt_manifest
 from wavesmith.art import build_art_brief
 from wavesmith.audio.analyzer import DEFAULT_FEATURE_FPS, AudioAnalysisError, analyze_audio
+from wavesmith.gpu import probe_gpu
 from wavesmith.lyrics import LyricCue, LyricsError, load_lyrics
 from wavesmith.presets.generator import generate_preset_dict
 from wavesmith.presets.loader import (
@@ -214,6 +215,23 @@ def validate_preset(
         raise typer.Exit(5) from exc
 
     console.print(f"[green]Valid preset:[/green] {preset.name}")
+
+
+@app.command("gpu-info")
+def gpu_info() -> None:
+    """Probe experimental ModernGL GPU rendering support."""
+    capability = probe_gpu()
+    if capability.available:
+        console.print("[green]GPU backend available[/green]")
+        console.print(f"backend={capability.backend}")
+        console.print(f"renderer={capability.renderer or 'unknown'}")
+        console.print(f"version={capability.version or 'unknown'}")
+        return
+
+    console.print("[red]GPU backend unavailable[/red]")
+    console.print(f"backend={capability.backend}")
+    console.print(f"error={capability.error or 'unknown error'}")
+    raise typer.Exit(4)
 
 
 @app.command("art-brief")

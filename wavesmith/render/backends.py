@@ -111,11 +111,20 @@ class GpuRenderBackend:
         lyrics: list[LyricCue],
         watermark_text: str | None,
     ) -> Iterator[bytes]:
-        """Fail explicitly until the GPU renderer is implemented."""
-        raise RenderBackendError(
-            "GPU backend is not implemented yet. Use --backend cpu for the stable renderer."
-        )
-        yield b""
+        """Yield frames from the experimental ModernGL backend."""
+        try:
+            from wavesmith.gpu.renderer import generate_gpu_frames
+
+            yield from generate_gpu_frames(
+                options=options,
+                duration_seconds=duration_seconds,
+                timeline=timeline,
+                preset=preset,
+                lyrics=lyrics,
+                watermark_text=watermark_text,
+            )
+        except Exception as exc:
+            raise RenderBackendError(str(exc)) from exc
 
 
 def get_render_backend(name: str) -> RenderBackend:

@@ -1,0 +1,33 @@
+name: gpu_shader_bloom
+version: 1
+description: Experimental ModernGL fullscreen bloom shader with audio-reactive spectrum turbulence.
+
+metadata:
+  family: shader
+  tags: [bloom, experimental, gpu, shader]
+
+canvas:
+  background: radial_void
+  glow: true
+
+palette:
+  mode: reactive
+  base: [46, 255, 172]
+  accent: [255, 68, 164]
+  beat: [255, 248, 220]
+
+watermark:
+  enabled: true
+  text: "Christian Kajsing // kajsing.com"
+  position: bottom_right
+  opacity: 0.5
+
+modules:
+  - type: shader_field
+    id: gpu_bloom
+    style: gpu_bloom
+    shader: bloom_field
+    opacity: 1.0
+    intensity_feature: rms
+    bass_feature: bass_energy
+    distortion_feature: treble_energy

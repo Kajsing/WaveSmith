@@ -40,6 +40,14 @@ wavesmith preview song.mp3 preview.mp4 --preset neon_orb
 wavesmith render song.mp3 preview.mp4 --preset neon_orb --resolution 640x360 --fps 15 --max-seconds 20
 ```
 
+GPU rendering is experimental and optional:
+
+```bash
+pip install -e .[dev,gpu]
+wavesmith gpu-info
+wavesmith preview song.mp3 gpu-preview.mp4 --backend gpu --preset gpu_shader_bloom
+```
+
 For richer shader-style visuals, try:
 
 ```bash

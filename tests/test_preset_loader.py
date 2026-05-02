@@ -15,6 +15,7 @@ def test_builtin_presets_are_available() -> None:
         "elemental_storm",
         "fire_dual_lines",
         "fire_natural_v2",
+        "gpu_shader_bloom",
         "ice_cracked_shards",
         "inferno_portal",
         "neon_orb",
@@ -39,6 +40,8 @@ def test_builtin_preset_summaries_include_metadata() -> None:
 
     assert summaries["earth_orb_spikes"].family == "earth"
     assert "spikes" in summaries["earth_orb_spikes"].tags
+    assert summaries["gpu_shader_bloom"].family == "shader"
+    assert "gpu" in summaries["gpu_shader_bloom"].tags
 
 
 @pytest.mark.parametrize(
@@ -49,6 +52,7 @@ def test_builtin_preset_summaries_include_metadata() -> None:
         "elemental_storm",
         "fire_dual_lines",
         "fire_natural_v2",
+        "gpu_shader_bloom",
         "ice_cracked_shards",
         "inferno_portal",
         "neon_orb",

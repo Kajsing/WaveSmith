@@ -4,6 +4,7 @@ from typer.testing import CliRunner
 
 from tests.audio_fixtures import write_test_tone
 from wavesmith.cli import _compact_path, app
+from wavesmith.gpu import GpuCapability
 from wavesmith.render.pipeline import RenderResult
 
 runner = CliRunner()
@@ -66,6 +67,24 @@ def test_validate_preset_accepts_builtin_file() -> None:
 
     assert result.exit_code == 0
     assert "Valid preset" in result.output
+
+
+def test_gpu_info_reports_available_backend(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "wavesmith.cli.probe_gpu",
+        lambda: GpuCapability(
+            available=True,
+            backend="moderngl",
+            renderer="Test GPU",
+            version="4.6",
+        ),
+    )
+
+    result = runner.invoke(app, ["gpu-info"])
+
+    assert result.exit_code == 0
+    assert "GPU backend available" in result.output
+    assert "renderer=Test GPU" in result.output
 
 
 def test_art_brief_command_writes_json(tmp_path) -> None:

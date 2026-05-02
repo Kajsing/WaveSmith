@@ -1,0 +1,1 @@
+"""Bundled GLSL shader sources."""
