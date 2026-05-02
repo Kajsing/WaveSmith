@@ -17,6 +17,12 @@ uniform vec3 u_palette_base;
 uniform vec3 u_palette_accent;
 uniform vec3 u_palette_beat;
 uniform float u_spectrum[32];
+uniform float u_detail;
+uniform float u_bloom_strength;
+uniform float u_warp_strength;
+uniform float u_line_strength;
+uniform float u_exposure;
+uniform float u_softness;
 
 float hash(vec2 p) {
     return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
@@ -44,10 +50,20 @@ float fbm(vec2 p) {
     return value;
 }
 
+float flowField(vec2 p, float t) {
+    float value = 0.0;
+    value += sin(p.x * 2.7 + p.y * 1.8 + t * 0.31) * 0.34;
+    value += sin(p.x * -1.6 + p.y * 3.1 - t * 0.24) * 0.28;
+    value += cos(length(p + vec2(0.18, -0.12)) * 5.4 - t * 0.42) * 0.22;
+    value += sin(atan(p.y, p.x) * 3.0 + length(p) * 7.5 + t * 0.18) * 0.16;
+    return value * 0.5 + 0.5;
+}
+
 float spectrumAt(float amount) {
-    float index = clamp(amount, 0.0, 0.999) * 31.0;
-    int left = int(floor(index));
-    int right = min(31, left + 1);
+    float wrapped = fract(amount);
+    float index = wrapped * 32.0;
+    int left = int(floor(index)) % 32;
+    int right = (left + 1) % 32;
     float blend = fract(index);
     return mix(u_spectrum[left], u_spectrum[right], blend);
 }
@@ -59,35 +75,42 @@ void main() {
     float r = length(p);
     float a = atan(p.y, p.x);
 
+    float detail = clamp(u_detail, 0.05, 1.5);
+    float softness = clamp(u_softness, 0.0, 1.5);
     float pulse = max(u_bass, u_slow_pulse * 0.82) + u_beat_decay * 0.22 + u_beat * 0.18;
-    float warp = fbm(p * (3.0 + u_treble * 4.0) + u_time * vec2(0.12, -0.08));
-    vec2 warped = p + vec2(cos(a * 2.0 + warp * 5.2), sin(a * 3.0 - warp * 4.0)) * 0.045;
+    float warp = fbm(p * (2.4 + u_treble * 2.8 + detail * 2.2) + u_time * vec2(0.1, -0.07));
+    vec2 warped = p + vec2(cos(a * 2.0 + warp * 4.3), sin(a * 3.0 - warp * 3.6)) * 0.042 * u_warp_strength;
     float wr = length(warped);
     float wa = atan(warped.y, warped.x);
 
     float ring_radius = 0.23 + u_bass * 0.06 + u_beat_decay * 0.025;
-    float ring = exp(-abs(wr - ring_radius) * (28.0 + u_rms * 38.0));
+    float ring_sharpness = mix(18.0, 44.0, clamp(1.0 - softness * 0.45 + detail * 0.25, 0.0, 1.0));
+    float ring = exp(-abs(wr - ring_radius) * (ring_sharpness + u_rms * 18.0));
     float inner = exp(-wr * (3.2 - u_bass * 0.9));
-    float halo = exp(-abs(wr - ring_radius * 1.55) * 8.0) * 0.55;
+    float halo = exp(-abs(wr - ring_radius * 1.55) * mix(5.0, 9.5, 1.0 - softness * 0.4)) * 0.62;
 
-    float bands = abs(sin(wa * 48.0 + u_time * (1.4 + u_treble * 2.2)));
-    float spectral = spectrumAt(fract((wa + 3.14159265) / 6.2831853));
-    float shards = pow(bands, 18.0) * spectral * (0.35 + u_treble * 1.2);
+    float bands = abs(sin(wa * mix(26.0, 64.0, detail) + u_time * (1.0 + u_treble * 1.7)));
+    float spectral = spectrumAt((wa + 3.14159265) / 6.2831853);
+    float shards = pow(bands, mix(5.5, 13.0, detail)) * spectral * (0.16 + u_treble * 0.72) * u_line_strength;
 
-    float field = fbm(warped * (7.0 + u_mid * 7.0) - u_time * 0.22);
-    float bloom = ring * (0.65 + pulse * 0.95) + inner * (0.22 + u_rms * 0.35);
-    bloom += halo * (0.22 + u_mid * 0.32) + shards * ring * 1.7;
-    bloom += smoothstep(0.58, 1.0, field) * (0.16 + u_treble * 0.22);
+    float mist = flowField(warped * (1.25 + u_mid * 0.55 + detail * 0.35), u_time);
+    float fine = fbm(warped * (18.0 + u_treble * 8.0 + detail * 7.0) + u_time * 0.11);
+    float grain = smoothstep(0.68, 1.0, fine) * (0.45 + mist * 0.35);
+    float bloom = ring * (0.78 + pulse * 0.82) + inner * (0.24 + u_rms * 0.28);
+    bloom += halo * (0.28 + u_mid * 0.28) + shards * ring * 1.35;
+    bloom += grain * (0.055 + u_treble * 0.08) * (0.65 + detail * 0.35);
+    bloom *= u_bloom_strength;
 
     vec3 base = mix(vec3(0.004, 0.006, 0.018), u_palette_base, 0.18 + u_rms * 0.18);
     vec3 color = base;
-    color = mix(color, u_palette_accent, clamp(ring * 0.72 + field * 0.18, 0.0, 1.0));
-    color = mix(color, u_palette_beat, clamp(shards * 0.7 + pulse * ring * 0.6, 0.0, 1.0));
-    color += u_palette_accent * bloom * 0.48;
-    color += u_palette_beat * pow(max(0.0, bloom), 2.0) * 0.38;
+    color = mix(color, u_palette_accent, clamp(ring * 0.68 + mist * 0.035, 0.0, 1.0));
+    color = mix(color, u_palette_beat, clamp(shards * 0.42 + pulse * ring * 0.5, 0.0, 1.0));
+    color += u_palette_accent * bloom * 0.44;
+    color += u_palette_beat * pow(max(0.0, bloom), 1.55 + detail * 0.35) * 0.34;
 
     float vignette = smoothstep(1.25, 0.2, r);
     color *= vignette;
-    color = vec3(1.0) - exp(-color * (1.05 + pulse * 0.55));
+    color = vec3(1.0) - exp(-color * (u_exposure + pulse * 0.42));
+    color = pow(color, vec3(0.92 + softness * 0.08));
     fragColor = vec4(clamp(color, 0.0, 1.0), 1.0);
 }

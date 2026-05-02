@@ -51,15 +51,13 @@ def generate_gpu_frames(
 
         vertices = ctx.buffer(
             struct.pack(
-                "8f",
+                "6f",
                 -1.0,
                 -1.0,
-                1.0,
+                3.0,
                 -1.0,
                 -1.0,
-                1.0,
-                1.0,
-                1.0,
+                3.0,
             )
         )
         vao = ctx.vertex_array(program, [(vertices, "2f", "in_pos")])
@@ -73,10 +71,10 @@ def generate_gpu_frames(
             progress = frame_index / max(1, frame_count - 1)
             time_seconds = frame_index / options.fps
             features = timeline.at(time_seconds)
-            _set_uniforms(program, options, preset, features, time_seconds, progress)
+            _set_uniforms(program, options, preset, module, features, time_seconds, progress)
             framebuffer.use()
             ctx.clear(0.0, 0.0, 0.0, 1.0)
-            vao.render(mode=moderngl.TRIANGLE_STRIP, vertices=4)
+            vao.render(mode=moderngl.TRIANGLES, vertices=3)
             raw = framebuffer.read(components=3, alignment=1)
             image = Image.frombytes("RGB", (options.width, options.height), raw)
             image = image.transpose(Image.Transpose.FLIP_TOP_BOTTOM)
@@ -119,6 +117,7 @@ def _set_uniforms(
     program: Any,
     options: RenderOptions,
     preset: PresetConfig,
+    module: PresetModule,
     features: dict[str, Any],
     time_seconds: float,
     progress: float,
@@ -140,6 +139,12 @@ def _set_uniforms(
         "u_palette_accent": _rgb01(preset.palette.accent),
         "u_palette_beat": _rgb01(preset.palette.beat),
         "u_spectrum": spectrum,
+        "u_detail": _module_float(module, "detail", 0.62),
+        "u_bloom_strength": _module_float(module, "bloom_strength", 0.92),
+        "u_warp_strength": _module_float(module, "warp_strength", 0.82),
+        "u_line_strength": _module_float(module, "line_strength", 0.52),
+        "u_exposure": _module_float(module, "exposure", 1.08),
+        "u_softness": _module_float(module, "softness", 0.72),
     }
     for name, value in uniforms.items():
         if name in program:
@@ -176,3 +181,10 @@ def _draw_cpu_overlays(
 
 def _rgb01(color: tuple[int, int, int]) -> tuple[float, float, float]:
     return tuple(channel / 255.0 for channel in color)
+
+
+def _module_float(module: PresetModule, name: str, default: float) -> float:
+    value = module.model_extra.get(name, default)
+    if not isinstance(value, int | float):
+        return default
+    return max(0.0, min(2.0, float(value)))

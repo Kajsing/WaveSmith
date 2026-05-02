@@ -64,6 +64,12 @@ def test_gpu_uniforms_prepare_audio_features() -> None:
         "u_bass": SimpleNamespace(value=None),
         "u_spectrum": SimpleNamespace(value=None),
         "u_palette_base": SimpleNamespace(value=None),
+        "u_detail": SimpleNamespace(value=None),
+        "u_bloom_strength": SimpleNamespace(value=None),
+        "u_warp_strength": SimpleNamespace(value=None),
+        "u_line_strength": SimpleNamespace(value=None),
+        "u_exposure": SimpleNamespace(value=None),
+        "u_softness": SimpleNamespace(value=None),
     }
     options = RenderOptions(
         input_audio=Path("song.wav"),
@@ -83,7 +89,9 @@ def test_gpu_uniforms_prepare_audio_features() -> None:
         "spectrum": [0.1, 0.2, 0.3],
     }
 
-    _set_uniforms(program, options, load_preset("gpu_shader_bloom"), features, 1.25, 0.5)
+    preset = load_preset("gpu_shader_bloom")
+
+    _set_uniforms(program, options, preset, preset.modules[0], features, 1.25, 0.5)
 
     assert program["u_resolution"].value == (64.0, 48.0)
     assert program["u_time"].value == 1.25
@@ -91,6 +99,12 @@ def test_gpu_uniforms_prepare_audio_features() -> None:
     assert program["u_bass"].value == 0.6
     assert len(program["u_spectrum"].value) == 32
     assert program["u_palette_base"].value == (46 / 255, 1.0, 172 / 255)
+    assert program["u_detail"].value == 0.46
+    assert program["u_bloom_strength"].value == 1.12
+    assert program["u_warp_strength"].value == 0.62
+    assert program["u_line_strength"].value == 0.06
+    assert program["u_exposure"].value == 1.16
+    assert program["u_softness"].value == 1.0
 
 
 def test_gpu_backend_smoke_renders_tiny_frames() -> None:

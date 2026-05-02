@@ -431,3 +431,29 @@ test -s .tmp/m6-batch-out/batch-summary.json
 - GPU rendering is not part of the current MVP.
 - Recommended future sequence: backend interface, CPU backend wrapper, GPU backend prototype, then
   quality/performance comparison.
+
+## 2026-05-02 - GPU Bloom Quality Pass
+
+### Changed
+
+- Added module-level quality knobs to `gpu_shader_bloom` for detail, bloom, warp, line strength,
+  exposure, and softness.
+- Updated the ModernGL backend to render with one oversized fullscreen triangle instead of a
+  two-triangle fullscreen quad.
+- Tuned `bloom_field.glsl` toward smoother flow-field mist, softer glow, lower block-like noise,
+  and subtler fine-grain texture.
+- Documented GPU quality notes in `docs/gpu-rendering.md`.
+
+### Validation Run
+
+```bash
+.venv/bin/wavesmith preview .tmp/music/Low\ Under-Skin.mp3 .tmp/music/gpu-bloom-preview-quality-v10-smooth.mp4 --backend gpu --preset gpu_shader_bloom --seconds 10 --fps 30 --thumbnail-at best --crf 12 --ffmpeg-preset slow --watermark ""
+.venv/bin/ruff check .
+.venv/bin/python -m pytest
+```
+
+### Result
+
+- GPU preview render succeeded on the local RTX 3080 Ti WSL setup.
+- Render output and thumbnails were written under `.tmp/` and `.renders/`, not committed.
+- Full validation passed.

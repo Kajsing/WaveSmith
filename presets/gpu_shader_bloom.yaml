@@ -28,6 +28,12 @@ modules:
     style: gpu_bloom
     shader: bloom_field
     opacity: 1.0
+    detail: 0.46
+    bloom_strength: 1.12
+    warp_strength: 0.62
+    line_strength: 0.06
+    exposure: 1.16
+    softness: 1.0
     intensity_feature: rms
     bass_feature: bass_energy
     distortion_feature: treble_energy
