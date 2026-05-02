@@ -46,6 +46,7 @@ GPU rendering is experimental and optional:
 pip install -e .[dev,gpu]
 wavesmith gpu-info
 wavesmith preview song.mp3 gpu-preview.mp4 --backend gpu --preset gpu_shader_bloom
+wavesmith preview song.mp3 gpu-solar.mp4 --backend gpu --preset gpu_fire_solar
 ```
 
 ## Compare Presets
@@ -53,7 +54,7 @@ wavesmith preview song.mp3 gpu-preview.mp4 --backend gpu --preset gpu_shader_blo
 Render the same audio through several presets and collect metrics in one summary:
 
 ```bash
-wavesmith compare song.mp3 .tmp/compare --preset gpu_shader_bloom --preset gpu_crystal_storm --backend gpu --seconds 10 --crf 12 --ffmpeg-preset slow
+wavesmith compare song.mp3 .tmp/compare --backend gpu --seconds 10 --crf 12 --ffmpeg-preset slow
 ```
 
 Compare writes one MP4 per preset, thumbnails under `.tmp/compare/thumbnails/`, and

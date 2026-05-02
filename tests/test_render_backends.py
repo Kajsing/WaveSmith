@@ -112,6 +112,7 @@ def test_gpu_shader_loader_rejects_unknown_or_unsafe_names() -> None:
 
     assert "#version" in _load_shader_source("bloom_field")
     assert "#version" in _load_shader_source("crystal_storm")
+    assert "#version" in _load_shader_source("solar_fire")
     with pytest.raises(RuntimeError, match="Unsupported GPU shader"):
         _load_shader_source("../bloom_field")
     with pytest.raises(RuntimeError, match="Unsupported GPU shader"):

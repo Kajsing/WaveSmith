@@ -531,3 +531,31 @@ test -s .tmp/m6-batch-out/batch-summary.json
 - Compare smoke render succeeded with 2 successes and 0 failures.
 - `compare-summary.json` was written under `.tmp/compare-smoke/`.
 - Full validation passed.
+
+## 2026-05-02 - GPU Solar Fire Preset
+
+### Changed
+
+- Added `gpu_fire_solar`, a GPU-first solar fire preset.
+- Added `solar_fire.glsl` with a low sun surface, animated granules, corona, sparks, and
+  audio-reactive prominence arcs.
+- Added `gpu_fire_solar` to the default GPU compare preset set.
+- Added preset and shader-loader tests for the new shader.
+
+### Validation Run
+
+```bash
+.venv/bin/wavesmith preview .tmp/music/Low\ Under-Skin.mp3 .tmp/music/gpu-fire-solar-preview-v1.mp4 --backend gpu --preset gpu_fire_solar --seconds 10 --fps 30 --thumbnail-at best --crf 12 --ffmpeg-preset slow --watermark ""
+.venv/bin/wavesmith compare .tmp/music/Low\ Under-Skin.mp3 .tmp/gpu-compare-solar-v1 --backend gpu --seconds 10 --fps 30 --crf 12 --ffmpeg-preset slow --watermark ""
+.venv/bin/ruff check .
+.venv/bin/python -m pytest
+```
+
+### Result
+
+- Solar preview rendered successfully on the local RTX 3080 Ti WSL setup.
+- GPU compare completed with 3 successes and 0 failures across `gpu_shader_bloom`,
+  `gpu_crystal_storm`, and `gpu_fire_solar`.
+- In the local compare run, `gpu_fire_solar` rendered at about 63 effective FPS at 640x360 with
+  `--crf 12` and `--ffmpeg-preset slow`.
+- Full validation passed.

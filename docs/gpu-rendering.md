@@ -23,6 +23,9 @@ port of the CPU presets.
 `gpu_crystal_storm` is the second GPU-first preset. It uses the same uniform contract, but targets a
 crystal/fracture visual language with radial shards, spectrum-driven sparkle, and beat bloom.
 
+`gpu_fire_solar` is the third GPU-first preset. It keeps the sun low in frame and drives solar
+surface texture, corona, sparks, and prominence-like flame arcs from the same audio features.
+
 The preset exposes shader quality controls through module fields:
 
 - `detail`
@@ -114,5 +117,5 @@ wavesmith compare .tmp/music/Low\ Under-Skin.mp3 .tmp/gpu-compare --backend gpu 
 The command writes one MP4 per preset, thumbnails under `OUTPUT_DIR/thumbnails/`, and
 `OUTPUT_DIR/compare-summary.json`.
 
-When `--preset` is omitted, `compare --backend gpu` defaults to `gpu_shader_bloom` and
-`gpu_crystal_storm`.
+When `--preset` is omitted, `compare --backend gpu` defaults to `gpu_shader_bloom`,
+`gpu_crystal_storm`, and `gpu_fire_solar`.

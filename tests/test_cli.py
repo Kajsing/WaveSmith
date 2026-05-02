@@ -284,7 +284,11 @@ def test_default_compare_presets_follow_backend() -> None:
     from wavesmith.cli import _default_compare_presets
 
     assert _default_compare_presets("cpu") == ["neon_orb", "shader_bloom", "waveform_ribbon"]
-    assert _default_compare_presets("gpu") == ["gpu_shader_bloom", "gpu_crystal_storm"]
+    assert _default_compare_presets("gpu") == [
+        "gpu_shader_bloom",
+        "gpu_crystal_storm",
+        "gpu_fire_solar",
+    ]
 
 
 def test_analyze_writes_json(tmp_path) -> None:

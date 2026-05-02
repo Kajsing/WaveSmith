@@ -1,0 +1,39 @@
+name: gpu_fire_solar
+version: 1
+description: Experimental GPU solar fire shader with low sun surface and audio-reactive prominences.
+
+metadata:
+  family: fire
+  tags: [experimental, fire, gpu, shader, solar]
+
+canvas:
+  background: solar_void
+  glow: true
+
+palette:
+  mode: reactive
+  base: [255, 78, 18]
+  accent: [255, 176, 44]
+  beat: [255, 246, 184]
+
+watermark:
+  enabled: true
+  text: "Christian Kajsing // kajsing.com"
+  position: bottom_right
+  opacity: 0.5
+
+modules:
+  - type: shader_field
+    id: gpu_solar_fire
+    style: gpu_fire
+    shader: solar_fire
+    opacity: 1.0
+    detail: 0.72
+    bloom_strength: 1.18
+    warp_strength: 0.68
+    line_strength: 0.58
+    exposure: 1.22
+    softness: 0.72
+    intensity_feature: rms
+    bass_feature: bass_energy
+    distortion_feature: treble_energy

@@ -630,7 +630,7 @@ def compare(
 
 def _default_compare_presets(backend: str) -> list[str]:
     if backend == "gpu":
-        return ["gpu_shader_bloom", "gpu_crystal_storm"]
+        return ["gpu_shader_bloom", "gpu_crystal_storm", "gpu_fire_solar"]
     return ["neon_orb", "shader_bloom", "waveform_ribbon"]
 
 
