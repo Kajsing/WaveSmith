@@ -24,6 +24,7 @@ from wavesmith.presets.loader import (
 )
 from wavesmith.render.backends import RenderBackendError
 from wavesmith.render.batch import run_batch
+from wavesmith.render.compare import run_compare
 from wavesmith.render.ffmpeg import FfmpegMissingError, FfmpegRenderError
 from wavesmith.render.options import RenderOptionsError, build_render_options, parse_resolution
 from wavesmith.render.pipeline import RenderResult, render_video
@@ -519,6 +520,118 @@ def preview(
         lyrics=lyrics,
         lyrics_offset=lyrics_offset,
     )
+
+
+@app.command()
+def compare(
+    input_audio: Annotated[Path, typer.Argument(help="Input MP3 or WAV file.")],
+    output_dir: Annotated[Path, typer.Argument(help="Directory for comparison outputs.")],
+    presets: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--preset",
+            help="Preset to compare. Repeat this option for multiple presets.",
+        ),
+    ] = None,
+    resolution: Annotated[
+        str,
+        typer.Option("--resolution", help="Comparison render resolution."),
+    ] = "640x360",
+    fps: Annotated[int, typer.Option("--fps", min=1, help="Frames per second.")] = 30,
+    seconds: Annotated[
+        float,
+        typer.Option("--seconds", min=0.1, help="Comparison duration limit."),
+    ] = 10.0,
+    watermark: Annotated[str | None, typer.Option("--watermark", help="Watermark text.")] = None,
+    crf: Annotated[
+        int,
+        typer.Option("--crf", min=0, max=51, help="ffmpeg CRF quality value."),
+    ] = 18,
+    ffmpeg_preset: Annotated[
+        str,
+        typer.Option("--ffmpeg-preset", help="ffmpeg encoder preset."),
+    ] = "medium",
+    backend: Annotated[
+        str,
+        typer.Option("--backend", help="Render backend: cpu or gpu."),
+    ] = "cpu",
+    force_analysis: Annotated[
+        bool,
+        typer.Option("--force-analysis", help="Bypass analysis cache for every render."),
+    ] = False,
+    thumbnails: Annotated[
+        bool,
+        typer.Option("--thumbnails/--no-thumbnails", help="Extract JPG thumbnails."),
+    ] = True,
+    thumbnail_at: Annotated[
+        str,
+        typer.Option(
+            "--thumbnail-at",
+            help="Thumbnail time: seconds, percent, best, or start/intro/middle/end.",
+        ),
+    ] = "best",
+    thumbnail_style: Annotated[
+        str,
+        typer.Option("--thumbnail-style", help="Thumbnail style: frame or poster."),
+    ] = "frame",
+    stop_on_error: Annotated[
+        bool,
+        typer.Option("--stop-on-error", help="Stop after the first failed preset."),
+    ] = False,
+) -> None:
+    """Render one audio file through multiple presets for side-by-side comparison."""
+    selected_presets = presets or _default_compare_presets(backend)
+    try:
+        width, height = parse_resolution(resolution)
+        for preset in selected_presets:
+            load_preset(preset)
+        summary = run_compare(
+            input_audio=input_audio,
+            output_dir=output_dir,
+            presets=selected_presets,
+            width=width,
+            height=height,
+            fps=fps,
+            seconds=seconds,
+            watermark=watermark,
+            crf=crf,
+            ffmpeg_preset=ffmpeg_preset,
+            backend=backend,
+            force_analysis=force_analysis,
+            thumbnails=thumbnails,
+            thumbnail_at=thumbnail_at,
+            thumbnail_style=thumbnail_style,
+            stop_on_error=stop_on_error,
+        )
+    except (ValueError, RenderOptionsError) as exc:
+        console.print(f"[red]Invalid compare options:[/red] {exc}")
+        raise typer.Exit(2) from exc
+    except PresetError as exc:
+        console.print(f"[red]Preset error:[/red] {exc}")
+        raise typer.Exit(2) from exc
+
+    table = Table("Preset", "Status", "FPS", "Output", "Thumbnail")
+    for item in summary.results:
+        table.add_row(
+            item.preset,
+            item.status,
+            f"{item.effective_fps:.1f}" if item.effective_fps is not None else "",
+            _compact_path(Path(item.output_video), keep=28),
+            _compact_path(Path(item.thumbnail), keep=28) if item.thumbnail else "",
+        )
+    console.print(table)
+    console.print(
+        f"[green]Compare complete:[/green] {summary.succeeded} succeeded, {summary.failed} failed"
+    )
+    console.print(f"summary={_compact_path(Path(summary.summary_path), keep=26)}")
+    if summary.failed:
+        raise typer.Exit(4)
+
+
+def _default_compare_presets(backend: str) -> list[str]:
+    if backend == "gpu":
+        return ["gpu_shader_bloom", "gpu_crystal_storm"]
+    return ["neon_orb", "shader_bloom", "waveform_ribbon"]
 
 
 @app.command()

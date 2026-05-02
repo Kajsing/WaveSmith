@@ -218,6 +218,75 @@ def test_preview_uses_low_cost_defaults(monkeypatch, tmp_path) -> None:
     assert seen["options"].thumbnail_at == "middle"
 
 
+def test_compare_command_passes_multiple_presets(monkeypatch, tmp_path) -> None:
+    audio = tmp_path / "song.wav"
+    audio.write_bytes(b"not real audio yet")
+    output_dir = tmp_path / "compare"
+    seen = {}
+
+    def fake_compare(**kwargs):
+        seen.update(kwargs)
+        from wavesmith.render.compare import CompareItemResult, CompareSummary
+
+        return CompareSummary(
+            input_audio=str(kwargs["input_audio"]),
+            output_dir=str(kwargs["output_dir"]),
+            total=2,
+            succeeded=2,
+            failed=0,
+            results=[
+                CompareItemResult(
+                    preset="neon_orb",
+                    output_video=str(output_dir / "song-neon_orb.mp4"),
+                    status="success",
+                    thumbnail=str(output_dir / "thumbnails/song-neon_orb.jpg"),
+                    effective_fps=24.0,
+                ),
+                CompareItemResult(
+                    preset="waveform_ribbon",
+                    output_video=str(output_dir / "song-waveform_ribbon.mp4"),
+                    status="success",
+                    thumbnail=str(output_dir / "thumbnails/song-waveform_ribbon.jpg"),
+                    effective_fps=30.0,
+                ),
+            ],
+            summary_path=str(output_dir / "compare-summary.json"),
+        )
+
+    monkeypatch.setattr("wavesmith.cli.run_compare", fake_compare)
+
+    result = runner.invoke(
+        app,
+        [
+            "compare",
+            str(audio),
+            str(output_dir),
+            "--preset",
+            "neon_orb",
+            "--preset",
+            "waveform_ribbon",
+            "--resolution",
+            "320x180",
+            "--seconds",
+            "2",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Compare complete" in result.output
+    assert seen["presets"] == ["neon_orb", "waveform_ribbon"]
+    assert seen["width"] == 320
+    assert seen["height"] == 180
+    assert seen["seconds"] == 2
+
+
+def test_default_compare_presets_follow_backend() -> None:
+    from wavesmith.cli import _default_compare_presets
+
+    assert _default_compare_presets("cpu") == ["neon_orb", "shader_bloom", "waveform_ribbon"]
+    assert _default_compare_presets("gpu") == ["gpu_shader_bloom", "gpu_crystal_storm"]
+
+
 def test_analyze_writes_json(tmp_path) -> None:
     audio = tmp_path / "tone.wav"
     output = tmp_path / "tone.analysis.json"

@@ -506,3 +506,28 @@ test -s .tmp/m6-batch-out/batch-summary.json
 - Example local metric: 150 frames at 640x360 rendered with an effective encode FPS of about 52
   using `gpu_crystal_storm`, `--crf 12`, and `--ffmpeg-preset slow`.
 - Full validation passed.
+
+## 2026-05-02 - Preset Compare Command
+
+### Changed
+
+- Added `wavesmith compare INPUT_AUDIO OUTPUT_DIR`.
+- The command renders the same audio through multiple presets using repeatable `--preset` options.
+- Compare outputs one MP4 per preset, optional thumbnails, and `compare-summary.json`.
+- Compare summaries include preset status, output paths, thumbnail paths, cache status, render log
+  path, backend, encode time, effective FPS, and output size.
+
+### Validation Run
+
+```bash
+.venv/bin/python scripts/generate_test_audio.py .tmp/compare-test.wav --seconds 2
+.venv/bin/wavesmith compare .tmp/compare-test.wav .tmp/compare-smoke --preset neon_orb --preset waveform_ribbon --resolution 320x180 --fps 10 --seconds 2 --watermark "" --crf 23 --ffmpeg-preset veryfast --thumbnail-at middle
+.venv/bin/ruff check .
+.venv/bin/python -m pytest
+```
+
+### Result
+
+- Compare smoke render succeeded with 2 successes and 0 failures.
+- `compare-summary.json` was written under `.tmp/compare-smoke/`.
+- Full validation passed.

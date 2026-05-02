@@ -26,11 +26,11 @@ pip install -e .[dev]
 wavesmith render song.mp3 out.mp4 --preset neon_orb --resolution 1920x1080 --fps 30
 ```
 
-CPU is the stable reference backend. The `gpu` backend flag is reserved for the future shader
-renderer and currently fails explicitly instead of silently falling back:
+CPU is the stable reference backend. GPU rendering is experimental and opt-in:
 
 ```bash
 wavesmith render song.mp3 out.mp4 --backend cpu
+wavesmith render song.mp3 out.mp4 --backend gpu --preset gpu_shader_bloom
 ```
 
 ## Quick Preview
@@ -47,6 +47,17 @@ pip install -e .[dev,gpu]
 wavesmith gpu-info
 wavesmith preview song.mp3 gpu-preview.mp4 --backend gpu --preset gpu_shader_bloom
 ```
+
+## Compare Presets
+
+Render the same audio through several presets and collect metrics in one summary:
+
+```bash
+wavesmith compare song.mp3 .tmp/compare --preset gpu_shader_bloom --preset gpu_crystal_storm --backend gpu --seconds 10 --crf 12 --ffmpeg-preset slow
+```
+
+Compare writes one MP4 per preset, thumbnails under `.tmp/compare/thumbnails/`, and
+`.tmp/compare/compare-summary.json`.
 
 For richer shader-style visuals, try:
 

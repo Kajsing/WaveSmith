@@ -101,3 +101,18 @@ Render logs include GPU/CPU comparison fields:
 
 The CLI summary also prints backend, encode time, and effective FPS. These numbers are meant for
 local comparison between presets and quality settings, not as formal benchmarks.
+
+## Comparing GPU Presets
+
+Use `wavesmith compare` to render multiple presets from the same audio file and collect metrics in
+one summary:
+
+```bash
+wavesmith compare .tmp/music/Low\ Under-Skin.mp3 .tmp/gpu-compare --backend gpu --preset gpu_shader_bloom --preset gpu_crystal_storm --resolution 640x360 --fps 30 --seconds 10 --crf 12 --ffmpeg-preset slow --watermark ""
+```
+
+The command writes one MP4 per preset, thumbnails under `OUTPUT_DIR/thumbnails/`, and
+`OUTPUT_DIR/compare-summary.json`.
+
+When `--preset` is omitted, `compare --backend gpu` defaults to `gpu_shader_bloom` and
+`gpu_crystal_storm`.
