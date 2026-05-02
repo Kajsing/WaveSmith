@@ -17,8 +17,8 @@ from wavesmith.lyrics import LyricCue, LyricsError, load_lyrics
 from wavesmith.presets.generator import generate_preset_dict
 from wavesmith.presets.loader import (
     PresetError,
+    PresetSummary,
     list_builtin_preset_summaries,
-    list_builtin_presets,
     load_preset,
 )
 from wavesmith.render.backends import RenderBackendError
@@ -145,30 +145,61 @@ def list_presets(
         bool,
         typer.Option("--json", help="Write preset metadata as JSON."),
     ] = False,
+    family: Annotated[
+        str | None,
+        typer.Option("--family", help="Only show presets in this family."),
+    ] = None,
+    tag: Annotated[
+        str | None,
+        typer.Option("--tag", help="Only show presets with this tag."),
+    ] = None,
 ) -> None:
     """List built-in visual presets."""
+    summaries = _filter_preset_summaries(list_builtin_preset_summaries(), family, tag)
     if as_json:
-        summaries = [
+        payload = [
             {
                 "name": summary.name,
                 "description": summary.description,
+                "family": summary.family,
+                "tags": list(summary.tags),
                 "modules": list(summary.modules),
                 "path": str(summary.path),
             }
-            for summary in list_builtin_preset_summaries()
+            for summary in summaries
         ]
-        console.print_json(json.dumps(summaries))
+        console.print_json(json.dumps(payload))
         return
 
     if details:
-        table = Table("Preset", "Modules", "Description")
-        for summary in list_builtin_preset_summaries():
-            table.add_row(summary.name, ", ".join(summary.modules), summary.description)
+        table = Table("Preset", "Family", "Tags", "Modules", "Description")
+        for summary in summaries:
+            table.add_row(
+                summary.name,
+                summary.family,
+                ", ".join(summary.tags),
+                ", ".join(summary.modules),
+                summary.description,
+            )
         console.print(table)
         return
 
-    for preset in list_builtin_presets():
-        console.print(preset)
+    for preset in summaries:
+        console.print(preset.name)
+
+
+def _filter_preset_summaries(
+    summaries: list[PresetSummary],
+    family: str | None,
+    tag: str | None,
+) -> list[PresetSummary]:
+    if family:
+        family = family.strip().lower()
+        summaries = [summary for summary in summaries if summary.family.lower() == family]
+    if tag:
+        tag = tag.strip().lower()
+        summaries = [summary for summary in summaries if tag in summary.tags]
+    return summaries
 
 
 @app.command()

@@ -3,6 +3,8 @@
 ```bash
 wavesmith list-presets
 wavesmith list-presets --details
+wavesmith list-presets --family earth --details
+wavesmith list-presets --tag fire
 wavesmith lyrics-inspect song.lrc
 wavesmith validate-preset presets/neon_orb.yaml
 wavesmith preview song.mp3 preview.mp4 --preset neon_orb

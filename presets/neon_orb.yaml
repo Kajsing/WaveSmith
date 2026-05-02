@@ -2,6 +2,10 @@ name: neon_orb
 version: 1
 description: Neon bass orb with spectrum ring, waveform ribbon, glow, and particles.
 
+metadata:
+  family: neon
+  tags: [neon, orb, particles, spectrum, waveform]
+
 canvas:
   background: radial_void
   glow: true

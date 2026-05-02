@@ -2,6 +2,10 @@ name: waveform_ribbon
 version: 1
 description: Flowing waveform ribbons with smooth glow and slower cinematic motion.
 
+metadata:
+  family: waveform
+  tags: [glow, ribbon, waveform]
+
 canvas:
   background: midnight_gradient
   glow: true

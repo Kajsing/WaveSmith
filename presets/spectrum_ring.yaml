@@ -2,6 +2,10 @@ name: spectrum_ring
 version: 1
 description: Symmetrical circular spectrum visualizer with crisp frequency motion.
 
+metadata:
+  family: spectrum
+  tags: [minimal, ring, spectrum]
+
 canvas:
   background: deep_black
   glow: true

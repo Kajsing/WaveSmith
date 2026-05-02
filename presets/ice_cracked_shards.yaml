@@ -2,6 +2,10 @@ name: ice_cracked_shards
 version: 1
 description: Cracked ice sheet with audio-reactive glacial spectrum shards.
 
+metadata:
+  family: ice
+  tags: [cracked, elemental, ice, shards]
+
 canvas:
   background: radial_void
   glow: true

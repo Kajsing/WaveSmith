@@ -73,6 +73,28 @@ class WatermarkConfig(BaseModel):
     opacity: float = Field(default=0.55, ge=0.0, le=1.0)
 
 
+class PresetMetadata(BaseModel):
+    """Human-facing browsing metadata for a preset."""
+
+    model_config = ConfigDict(extra="allow")
+
+    family: str = Field(default="general", min_length=1)
+    tags: list[str] = Field(default_factory=list)
+
+    @field_validator("family", mode="before")
+    @classmethod
+    def validate_family(cls, value: str) -> str:
+        """Normalize family values for stable CLI filtering."""
+        return str(value).strip().lower()
+
+    @field_validator("tags")
+    @classmethod
+    def validate_tags(cls, value: list[str]) -> list[str]:
+        """Normalize tag values while preserving YAML readability."""
+        tags = [str(tag).strip().lower() for tag in value if str(tag).strip()]
+        return sorted(set(tags))
+
+
 class PresetConfig(BaseModel):
     """Validated v1 preset contract."""
 
@@ -81,6 +103,7 @@ class PresetConfig(BaseModel):
     name: str = Field(min_length=1)
     version: int = Field(ge=1)
     description: str = Field(min_length=1)
+    metadata: PresetMetadata = Field(default_factory=PresetMetadata)
     canvas: CanvasConfig
     palette: PaletteConfig
     watermark: WatermarkConfig | None = None

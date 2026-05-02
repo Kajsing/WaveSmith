@@ -33,9 +33,10 @@ def test_list_presets_details_shows_descriptions() -> None:
 
     assert result.exit_code == 0
     assert "Preset" in result.output
+    assert "Family" in result.output
     assert "shader_bloom" in result.output
     assert "shader_field" in result.output
-    assert "fields with bloom" in result.output
+    assert "bloom" in result.output
 
 
 def test_list_presets_json_writes_metadata() -> None:
@@ -43,7 +44,21 @@ def test_list_presets_json_writes_metadata() -> None:
 
     assert result.exit_code == 0
     assert '"name": "neon_orb"' in result.output
+    assert '"family": "neon"' in result.output
     assert '"modules"' in result.output
+
+
+def test_list_presets_filters_by_family_and_tag() -> None:
+    family_result = runner.invoke(app, ["list-presets", "--family", "earth"])
+    tag_result = runner.invoke(app, ["list-presets", "--tag", "portal"])
+
+    assert family_result.exit_code == 0
+    assert "earth_orb_spikes" in family_result.output
+    assert "earth_surface_spikes" in family_result.output
+    assert "fire_natural_v2" not in family_result.output
+    assert tag_result.exit_code == 0
+    assert "inferno_portal" in tag_result.output
+    assert "neon_orb" not in tag_result.output
 
 
 def test_validate_preset_accepts_builtin_file() -> None:

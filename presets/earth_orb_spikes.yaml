@@ -2,6 +2,10 @@ name: earth_orb_spikes
 version: 1
 description: Center earth orb with a fine audio-reactive organic spike halo.
 
+metadata:
+  family: earth
+  tags: [earth, elemental, organic, orb, spikes]
+
 canvas:
   background: radial_void
   glow: true

@@ -21,6 +21,8 @@ class PresetSummary:
 
     name: str
     description: str
+    family: str
+    tags: tuple[str, ...]
     modules: tuple[str, ...]
     path: Path
 
@@ -42,6 +44,8 @@ def list_builtin_preset_summaries() -> list[PresetSummary]:
             PresetSummary(
                 name=preset.name,
                 description=preset.description,
+                family=preset.metadata.family,
+                tags=tuple(preset.metadata.tags),
                 modules=tuple(module.type for module in preset.modules),
                 path=path,
             )

@@ -2,6 +2,10 @@ name: shader_bloom
 version: 1
 description: Layered shader-style light fields with bloom, vortex motion, and bass-reactive orb glow.
 
+metadata:
+  family: shader
+  tags: [bloom, neon, shader, vortex]
+
 canvas:
   background: radial_void
   glow: true

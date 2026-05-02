@@ -2,6 +2,10 @@ name: fire_dual_lines
 version: 1
 description: Two fast perspective fire trails with texture-ready line rendering.
 
+metadata:
+  family: fire
+  tags: [elemental, fire, lines, stereo]
+
 canvas:
   background: radial_void
   glow: true

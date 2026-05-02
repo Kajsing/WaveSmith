@@ -128,6 +128,8 @@ wavesmith render song.mp3 preview.mp4 --preset shader_bloom --thumbnail --thumbn
 ```bash
 wavesmith list-presets
 wavesmith list-presets --details
+wavesmith list-presets --family earth --details
+wavesmith list-presets --tag fire
 ```
 
 ## Validate A Preset
@@ -154,6 +156,8 @@ python -m pytest
 ## Generated Files
 
 Rendered videos, user audio, logs, and large analysis caches should not be committed to Git.
+Use `.tmp/art/` for generated image experiments. Move selected reusable textures, backdrops, or
+reference frames into `assets/` when they should become part of the project.
 
 ## Roadmap
 

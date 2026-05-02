@@ -1,6 +1,11 @@
 import pytest
 
-from wavesmith.presets.loader import PresetError, list_builtin_presets, load_preset
+from wavesmith.presets.loader import (
+    PresetError,
+    list_builtin_preset_summaries,
+    list_builtin_presets,
+    load_preset,
+)
 
 
 def test_builtin_presets_are_available() -> None:
@@ -23,8 +28,17 @@ def test_load_builtin_preset_by_name() -> None:
     preset = load_preset("neon_orb")
 
     assert preset.name == "neon_orb"
+    assert preset.metadata.family == "neon"
+    assert "spectrum" in preset.metadata.tags
     assert preset.modules[0].type == "center_orb"
     assert preset.palette.base == (180, 80, 255)
+
+
+def test_builtin_preset_summaries_include_metadata() -> None:
+    summaries = {summary.name: summary for summary in list_builtin_preset_summaries()}
+
+    assert summaries["earth_orb_spikes"].family == "earth"
+    assert "spikes" in summaries["earth_orb_spikes"].tags
 
 
 @pytest.mark.parametrize(

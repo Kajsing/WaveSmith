@@ -2,6 +2,10 @@ name: earth_surface_spikes
 version: 1
 description: Living earth surface with fine moss-like audio-reactive green spikes.
 
+metadata:
+  family: earth
+  tags: [earth, elemental, organic, spikes, surface]
+
 canvas:
   background: radial_void
   glow: true

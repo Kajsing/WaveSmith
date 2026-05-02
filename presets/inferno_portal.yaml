@@ -2,6 +2,10 @@ name: inferno_portal
 version: 1
 description: Cinematic fire portal with waveform beam, spectrum spires, sparks, and heat motion.
 
+metadata:
+  family: fire
+  tags: [cinematic, fire, portal, spectrum, waveform]
+
 canvas:
   background: radial_void
   glow: true

@@ -2,6 +2,10 @@ name: elemental_storm
 version: 1
 description: Fire, water, and plasma layers wrapped around a high-energy shader visualizer.
 
+metadata:
+  family: elemental
+  tags: [elemental, fire, plasma, storm, water]
+
 canvas:
   background: radial_void
   glow: true

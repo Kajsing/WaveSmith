@@ -2,6 +2,10 @@ name: fire_natural_v2
 version: 1
 description: Solar-style fire field driven by slow pulse and bass decay motion.
 
+metadata:
+  family: fire
+  tags: [elemental, fire, natural, solar]
+
 canvas:
   background: radial_void
   glow: true
