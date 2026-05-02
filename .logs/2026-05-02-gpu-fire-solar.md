@@ -57,3 +57,22 @@ Latest local preview:
 
 Future option: add a sibling preset that places the whole sun in the center of frame with magnetic
 arcs around the full circumference.
+
+## Soft Eruption Pass
+
+The branching version was still too sharp/spiky. The shader now shifts toward softer solar
+simulation cues:
+
+- broader loop distance fields;
+- turbulent eruption clouds near active flare sources;
+- visible source hotspots on the solar rim;
+- lower hard-line dominance and warmer plasma color mixing.
+
+Latest local preview:
+
+```bash
+.venv/bin/wavesmith preview .tmp/music/Low\ Under-Skin.mp3 .tmp/music/gpu-fire-solar-preview-v11-soft-bursts.mp4 --backend gpu --preset gpu_fire_solar --seconds 10 --fps 30 --thumbnail-at best --crf 12 --ffmpeg-preset slow --watermark ""
+```
+
+More test songs are needed to tune the music mapping: bass should push eruption size, transient
+hits should create short source flashes, and treble should add fine outer filament motion.

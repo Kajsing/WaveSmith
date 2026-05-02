@@ -28,6 +28,7 @@ build/
 *.flac
 *.m4a
 *.ogg
+*:Zone.Identifier
 
 # Keep docs/examples placeholders
 !.logs/README.md

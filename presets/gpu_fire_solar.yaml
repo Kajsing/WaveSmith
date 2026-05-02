@@ -31,9 +31,9 @@ modules:
     detail: 0.72
     bloom_strength: 1.18
     warp_strength: 0.68
-    line_strength: 0.58
+    line_strength: 0.42
     exposure: 1.22
-    softness: 0.72
+    softness: 1.05
     intensity_feature: rms
     bass_feature: bass_energy
     distortion_feature: treble_energy

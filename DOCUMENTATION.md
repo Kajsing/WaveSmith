@@ -613,3 +613,31 @@ test -s .tmp/m6-batch-out/batch-summary.json
 
 - A later alternate GPU solar preset could use a whole sun centered in frame with surrounding
   magnetic arcs instead of the current low-horizon solar surface perspective.
+
+## 2026-05-02 - GPU Solar Soft Eruption Pass
+
+### Changed
+
+- Softened the solar flare look away from sharp filament spikes.
+- Added a turbulent eruption cloud layer around active flare sources.
+- Added source hotspots so bass/beat-driven explosions have visible origins on the solar rim.
+- Reduced hard line dominance and tuned the preset toward softer, warmer plasma.
+- Ignored Windows `*:Zone.Identifier` sidecar files so downloaded test songs do not add noisy Git
+  status entries.
+
+### Validation Run
+
+```bash
+.venv/bin/wavesmith preview .tmp/music/Low\ Under-Skin.mp3 .tmp/music/gpu-fire-solar-preview-v11-soft-bursts.mp4 --backend gpu --preset gpu_fire_solar --seconds 10 --fps 30 --thumbnail-at best --crf 12 --ffmpeg-preset slow --watermark ""
+.venv/bin/ruff check .
+.venv/bin/python -m pytest
+```
+
+### Result
+
+- Solar preview rendered successfully with softer eruption clouds and less spiky flare lines.
+- Local preview metric: about 60 effective FPS at 640x360 with `--crf 12` and
+  `--ffmpeg-preset slow`.
+- More test songs will help tune whether bass/beat flare growth and treble filament detail feel
+  musical across different material.
+- Full validation passed.
