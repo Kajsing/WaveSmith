@@ -28,12 +28,12 @@ modules:
     style: gpu_fire
     shader: solar_fire
     opacity: 1.0
-    detail: 0.72
-    bloom_strength: 1.18
+    detail: 0.78
+    bloom_strength: 0.9
     warp_strength: 0.68
-    line_strength: 0.42
-    exposure: 1.22
-    softness: 1.05
+    line_strength: 0.22
+    exposure: 0.86
+    softness: 1.08
     intensity_feature: rms
     bass_feature: bass_energy
     distortion_feature: treble_energy

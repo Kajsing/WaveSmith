@@ -641,3 +641,39 @@ test -s .tmp/m6-batch-out/batch-summary.json
 - More test songs will help tune whether bass/beat flare growth and treble filament detail feel
   musical across different material.
 - Full validation passed.
+
+## 2026-05-03 - GPU Solar EUV Prominence Pass
+
+### Changed
+
+- Reworked `gpu_fire_solar` toward a solar-observatory/EUV prominence look.
+- Moved active flare sources onto the upper solar limb so the low-sun perspective reads more
+  clearly.
+- Replaced reversed GLSL `smoothstep` masks with explicit inverse smoothsteps to avoid undefined
+  driver behavior.
+- Reduced broad volumetric haze layers and shifted emphasis back to soft magnetic arcs and
+  localized footpoint hotspots.
+- Tuned the preset with lower global exposure/bloom and less line strength so the background stays
+  darker while hotspots can still flare with the audio.
+- Added `.logs/2026-05-03-gpu-solar-euv-pass.md` with implementation notes.
+
+### Validation Run
+
+```bash
+.venv/bin/wavesmith preview .tmp/music/Low\ Under-Skin.mp3 .tmp/music/gpu-fire-solar-preview-v19-hotspot-arcs.mp4 --backend gpu --preset gpu_fire_solar --seconds 10 --fps 30 --thumbnail-at best --crf 12 --ffmpeg-preset slow --watermark=
+.venv/bin/ruff check .
+.venv/bin/python -m pytest
+```
+
+### Result
+
+- Solar preview rendered successfully on the local GPU backend.
+- Local preview metric: about 37 effective FPS at 640x360 with `--crf 12` and
+  `--ffmpeg-preset slow`.
+- Full validation passed.
+
+### Known Issues
+
+- The solar effect is still a stylized shader, not a physically accurate plasma simulation.
+- More varied songs should be used to tune flare lifecycle, especially how slow pulses trigger
+  hotspot growth and decay.
