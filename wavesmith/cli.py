@@ -55,6 +55,11 @@ def _version_callback(value: bool) -> None:
 def _print_render_summary(output_video: Path, result: RenderResult) -> None:
     console.print(f"[green]Rendered:[/green] {output_video} ({result.duration_seconds:.2f}s)")
     console.print(f"analysis_cache={result.cache_status} cache={_compact_path(result.cache_path)}")
+    if result.effective_fps is not None and result.encode_elapsed_seconds is not None:
+        console.print(
+            f"backend={result.backend} encode_time={result.encode_elapsed_seconds:.2f}s "
+            f"effective_fps={result.effective_fps:.1f}"
+        )
     console.print(f"render_log={_compact_path(result.log_path, keep=26)}")
     if result.thumbnail_path:
         console.print(f"thumbnail={_compact_path(result.thumbnail_path, keep=26)}")

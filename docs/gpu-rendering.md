@@ -85,3 +85,19 @@ Crystal storm comparison render:
 ```bash
 wavesmith preview .tmp/music/Low\ Under-Skin.mp3 .tmp/music/gpu-crystal-storm-preview-v2.mp4 --backend gpu --preset gpu_crystal_storm --seconds 10 --fps 30 --thumbnail-at best --crf 12 --ffmpeg-preset slow --watermark ""
 ```
+
+## Timing Metrics
+
+Render logs include GPU/CPU comparison fields:
+
+- `backend`
+- `crf`
+- `ffmpeg_preset`
+- `frame_count`
+- `total_elapsed_seconds`
+- `encode_elapsed_seconds`
+- `effective_fps`
+- `output_size_bytes`
+
+The CLI summary also prints backend, encode time, and effective FPS. These numbers are meant for
+local comparison between presets and quality settings, not as formal benchmarks.

@@ -20,6 +20,10 @@ class BatchItemResult:
     thumbnail: str | None = None
     cache_status: str | None = None
     log_path: str | None = None
+    backend: str | None = None
+    encode_elapsed_seconds: float | None = None
+    effective_fps: float | None = None
+    output_size_bytes: int | None = None
     error: str | None = None
 
 
@@ -121,6 +125,10 @@ def run_batch(
                     else None,
                     cache_status=render_result.cache_status,
                     log_path=str(render_result.log_path),
+                    backend=render_result.backend,
+                    encode_elapsed_seconds=render_result.encode_elapsed_seconds,
+                    effective_fps=render_result.effective_fps,
+                    output_size_bytes=render_result.output_size_bytes,
                 )
             )
 

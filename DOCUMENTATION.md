@@ -481,3 +481,28 @@ test -s .tmp/m6-batch-out/batch-summary.json
 - GPU crystal storm preview rendered successfully on the local RTX 3080 Ti WSL setup.
 - Render output and thumbnails were written under `.tmp/` and `.renders/`, not committed.
 - Full validation passed.
+
+## 2026-05-02 - Render Timing Metrics
+
+### Changed
+
+- Added render timing metrics to `RenderResult`.
+- Render logs now include backend, CRF, ffmpeg preset, frame count, total elapsed time, encode
+  elapsed time, effective FPS, and output size.
+- CLI render/preview summaries now print backend, encode time, and effective FPS when available.
+- Batch summaries now preserve per-item backend, encode time, effective FPS, and output size.
+
+### Validation Run
+
+```bash
+.venv/bin/wavesmith preview .tmp/music/Low\ Under-Skin.mp3 .tmp/music/gpu-crystal-storm-metrics-smoke.mp4 --backend gpu --preset gpu_crystal_storm --seconds 5 --fps 30 --thumbnail-at best --crf 12 --ffmpeg-preset slow --watermark ""
+.venv/bin/ruff check .
+.venv/bin/python -m pytest
+```
+
+### Result
+
+- GPU metrics smoke render succeeded.
+- Example local metric: 150 frames at 640x360 rendered with an effective encode FPS of about 52
+  using `gpu_crystal_storm`, `--crf 12`, and `--ffmpeg-preset slow`.
+- Full validation passed.

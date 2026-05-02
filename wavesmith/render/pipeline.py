@@ -1,8 +1,10 @@
 """Render pipeline orchestration."""
 
+import math
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
+from time import perf_counter
 
 from wavesmith.audio.cache import CachedAnalysis, load_or_analyze_audio
 from wavesmith.lyrics import LyricCue, load_lyrics
@@ -31,19 +33,29 @@ class RenderResult:
     log_path: Path
     thumbnail_path: Path | None = None
     thumbnail_time_seconds: float | None = None
+    backend: str | None = None
+    frame_count: int | None = None
+    total_elapsed_seconds: float | None = None
+    encode_elapsed_seconds: float | None = None
+    effective_fps: float | None = None
+    output_size_bytes: int | None = None
 
 
 def render_video(options: RenderOptions) -> RenderResult:
     """Render audio-reactive frames and mux them with the source audio."""
+    total_started = perf_counter()
     preset = load_preset(options.preset)
     log_path = render_log_path(options.input_audio)
     duration_seconds: float | None = None
     thumbnail_time: float | None = None
     cached: CachedAnalysis | None = None
     command: list[str] | None = None
+    frame_count: int | None = None
+    encode_elapsed: float | None = None
     try:
         source_duration = probe_duration_seconds(options.input_audio)
         duration_seconds = min(source_duration, options.max_seconds or source_duration)
+        frame_count = max(1, math.ceil(duration_seconds * options.fps))
         cached = load_or_analyze_audio(
             options.input_audio,
             force=options.force_analysis,
@@ -64,6 +76,7 @@ def render_video(options: RenderOptions) -> RenderResult:
             ffmpeg_preset=options.ffmpeg_preset,
         )
         backend = get_render_backend(options.backend)
+        encode_started = perf_counter()
         encode_raw_frames(
             command=command,
             frames=backend.generate_frames(
@@ -75,6 +88,7 @@ def render_video(options: RenderOptions) -> RenderResult:
                 watermark_text=_watermark_text(options, preset),
             ),
         )
+        encode_elapsed = perf_counter() - encode_started
         thumbnail_path = _thumbnail_path(options)
         if thumbnail_path:
             thumbnail_time = resolve_thumbnail_time(
@@ -97,6 +111,7 @@ def render_video(options: RenderOptions) -> RenderResult:
                     duration_seconds=duration_seconds,
                 )
     except Exception as exc:
+        total_elapsed = perf_counter() - total_started
         write_render_log(
             path=log_path,
             status="failed",
@@ -106,6 +121,14 @@ def render_video(options: RenderOptions) -> RenderResult:
             duration_seconds=duration_seconds,
             resolution=f"{options.width}x{options.height}",
             fps=options.fps,
+            backend=options.backend,
+            crf=options.crf,
+            ffmpeg_preset=options.ffmpeg_preset,
+            frame_count=frame_count,
+            total_elapsed_seconds=total_elapsed,
+            encode_elapsed_seconds=encode_elapsed,
+            effective_fps=_effective_fps(frame_count, encode_elapsed),
+            output_size_bytes=_output_size(options.output_video),
             cache_status=cached.cache_status if cached else None,
             cache_path=cached.cache_path if cached else None,
             ffmpeg_command=command,
@@ -115,6 +138,9 @@ def render_video(options: RenderOptions) -> RenderResult:
         )
         raise
 
+    total_elapsed = perf_counter() - total_started
+    output_size = _output_size(options.output_video)
+    effective_fps = _effective_fps(frame_count, encode_elapsed)
     write_render_log(
         path=log_path,
         status="success",
@@ -124,6 +150,14 @@ def render_video(options: RenderOptions) -> RenderResult:
         duration_seconds=duration_seconds,
         resolution=f"{options.width}x{options.height}",
         fps=options.fps,
+        backend=options.backend,
+        crf=options.crf,
+        ffmpeg_preset=options.ffmpeg_preset,
+        frame_count=frame_count,
+        total_elapsed_seconds=total_elapsed,
+        encode_elapsed_seconds=encode_elapsed,
+        effective_fps=effective_fps,
+        output_size_bytes=output_size,
         cache_status=cached.cache_status,
         cache_path=cached.cache_path,
         ffmpeg_command=command,
@@ -137,6 +171,12 @@ def render_video(options: RenderOptions) -> RenderResult:
         log_path=log_path,
         thumbnail_path=_thumbnail_path(options),
         thumbnail_time_seconds=thumbnail_time,
+        backend=options.backend,
+        frame_count=frame_count,
+        total_elapsed_seconds=total_elapsed,
+        encode_elapsed_seconds=encode_elapsed,
+        effective_fps=effective_fps,
+        output_size_bytes=output_size,
     )
 
 
@@ -202,3 +242,16 @@ def _thumbnail_path(options: RenderOptions) -> Path | None:
     if options.thumbnail_path:
         return options.thumbnail_path
     return Path(".renders/thumbnails") / f"{options.output_video.stem}.jpg"
+
+
+def _effective_fps(frame_count: int | None, elapsed_seconds: float | None) -> float | None:
+    if frame_count is None or elapsed_seconds is None or elapsed_seconds <= 0:
+        return None
+    return frame_count / elapsed_seconds
+
+
+def _output_size(path: Path) -> int | None:
+    try:
+        return path.stat().st_size
+    except OSError:
+        return None
