@@ -57,16 +57,26 @@ float spectrumAt(float amount) {
     return mix(u_spectrum[left], u_spectrum[right], fract(index));
 }
 
-float plume(vec2 p, vec2 base, vec2 normal, vec2 tangent, float height, float width, float phase) {
-    vec2 q = p - base;
-    float up = dot(q, normal);
-    float side = dot(q, tangent);
-    float sway = sin(up * 17.0 + phase) * width * 0.42 + sin(up * 9.0 - phase * 0.7) * width * 0.2;
-    float taper = smoothstep(0.0, height * 0.16, up) * smoothstep(height, height * 0.22, up);
-    float strand = exp(-abs(side - sway) * (20.0 / max(0.02, width)));
-    float body = exp(-abs(side - sway) * (5.4 / max(0.04, width)));
-    float lick = strand * 0.62 + body * 0.22;
-    return lick * taper;
+float loopArc(vec2 p, vec2 foot_a, vec2 foot_b, vec2 lift, float width, float phase) {
+    float best = 0.0;
+    for (int i = 0; i < 24; i++) {
+        float t0 = float(i) / 24.0;
+        float t1 = float(i + 1) / 24.0;
+        vec2 a = mix(foot_a, foot_b, t0) + lift * sin(t0 * 3.14159265);
+        vec2 b = mix(foot_a, foot_b, t1) + lift * sin(t1 * 3.14159265);
+        a += vec2(sin(t0 * 9.0 + phase), cos(t0 * 7.0 - phase * 0.6)) * width * 0.42;
+        b += vec2(sin(t1 * 9.0 + phase), cos(t1 * 7.0 - phase * 0.6)) * width * 0.42;
+        vec2 pa = p - a;
+        vec2 ba = b - a;
+        float h = clamp(dot(pa, ba) / max(0.0001, dot(ba, ba)), 0.0, 1.0);
+        float d = length(pa - ba * h);
+        float t = mix(t0, t1, h);
+        float strand = exp(-d * (2.1 / max(0.02, width)));
+        float core = exp(-d * (0.72 / max(0.03, width)));
+        float taper = smoothstep(0.0, 0.16, t) * smoothstep(1.0, 0.84, t);
+        best = max(best, (strand * 0.72 + core * 0.2) * taper);
+    }
+    return best;
 }
 
 void main() {
@@ -92,36 +102,55 @@ void main() {
     float surface = disk * (0.38 + granules * 0.34 + cells * 0.26);
 
     float prominences = 0.0;
+    float wisps = 0.0;
     float sparks = 0.0;
-    for (int i = 0; i < 24; i++) {
+    for (int i = 0; i < 7; i++) {
         float fi = float(i);
-        float t = fi / 23.0;
-        float anchor_angle = mix(0.18, 0.82, t) * 3.14159265;
-        float amount = spectrumAt(t);
-        vec2 normal = vec2(cos(anchor_angle), sin(anchor_angle));
+        float t = fi / 6.0;
+        float center_angle = mix(0.16, 0.84, t) * 3.14159265 + sin(fi * 5.17) * 0.075;
+        float spread = 0.07 + 0.04 * sin(fi * 2.4);
+        float amount = spectrumAt(t * 0.86 + 0.07);
+        float life = 0.5 + 0.5 * sin(u_time * (0.16 + 0.035 * fi) + fi * 1.71);
+        float gate = smoothstep(0.36, 0.86, life + amount * 0.28 + u_bass * 0.12);
+        float active_level = gate * gate;
+        vec2 normal = vec2(cos(center_angle), sin(center_angle));
         vec2 tangent = vec2(-normal.y, normal.x);
-        vec2 base = sun_center + normal * sun_radius;
-        float local = sin(u_time * (0.55 + amount * 0.45) + fi * 4.31);
-        float height = (0.08 + amount * 0.2 + u_slow_pulse * 0.08) * (0.82 + pulse * 0.28);
-        float width = 0.018 + amount * 0.026 + u_line_strength * 0.02;
-        float active_level = smoothstep(0.12, 0.72, amount + u_bass * 0.28 + local * 0.16);
-        prominences += plume(p, base, normal, tangent, height, width, u_time * 1.2 + fi) * active_level;
+        vec2 foot_a = sun_center + vec2(cos(center_angle - spread), sin(center_angle - spread)) * sun_radius;
+        vec2 foot_b = sun_center + vec2(cos(center_angle + spread), sin(center_angle + spread)) * sun_radius;
+        float height = 0.17 + amount * 0.24 + u_slow_pulse * 0.09 + life * 0.1;
+        vec2 lift = normal * height + tangent * sin(u_time * 0.18 + fi) * height * 0.18;
+        float width = 0.023 + amount * 0.018 + u_line_strength * 0.015;
+        float flare = loopArc(p, foot_a, foot_b, lift, width, u_time * 0.55 + fi * 2.3);
+        prominences += flare * active_level;
 
-        vec2 spark_pos = base + normal * height * (0.45 + 0.35 * local) + tangent * local * width * 2.2;
-        sparks += exp(-length(p - spark_pos) * (28.0 + detail * 30.0)) * amount * active_level;
+        float wisp = loopArc(
+            p,
+            foot_a + normal * 0.025,
+            foot_b + normal * 0.018,
+            lift * (1.18 + amount * 0.22),
+            width * 1.75,
+            u_time * 0.38 + fi * 1.4
+        );
+        wisps += wisp * active_level * (0.22 + amount * 0.28);
+
+        vec2 spark_pos = mix(foot_a, foot_b, 0.5) + lift * (0.9 + life * 0.18);
+        sparks += exp(-length(p - spark_pos) * (22.0 + detail * 22.0)) * amount * active_level;
     }
 
     float heat_haze = fbm(p * (5.5 + detail * 2.5) + vec2(u_time * 0.08, -u_time * 0.18));
+    float plasma_noise = fbm(p * (12.0 + detail * 6.0) + vec2(u_time * 0.12, -u_time * 0.24));
+    prominences *= 0.82 + plasma_noise * 0.42;
+    wisps *= 0.7 + plasma_noise * 0.62;
     float smoke = smoothstep(0.42, 0.92, heat_haze) * corona * (0.12 + u_mid * 0.18);
     float bloom = surface * 0.45 + rim * (0.48 + pulse * 0.65);
-    bloom += corona * 0.16 + prominences * 1.25 + sparks * 0.9 + smoke;
+    bloom += corona * 0.16 + prominences * 1.45 + wisps * 0.62 + sparks * 0.65 + smoke;
     bloom *= u_bloom_strength;
 
     vec3 deep = vec3(0.012, 0.002, 0.0);
     vec3 ember = mix(u_palette_base, u_palette_accent, 0.36);
     vec3 color = mix(deep, ember, clamp(surface + smoke * 0.45, 0.0, 1.0));
-    color = mix(color, u_palette_accent, clamp(rim * 0.62 + prominences * 0.58, 0.0, 1.0));
-    color = mix(color, u_palette_beat, clamp(sparks * 0.68 + pulse * rim * 0.4, 0.0, 1.0));
+    color = mix(color, u_palette_accent, clamp(rim * 0.62 + prominences * 0.72 + wisps * 0.28, 0.0, 1.0));
+    color = mix(color, u_palette_beat, clamp(sparks * 0.45 + pulse * rim * 0.4 + prominences * 0.18, 0.0, 1.0));
     color += u_palette_accent * bloom * 0.42;
     color += u_palette_beat * pow(max(0.0, bloom), 1.55 + detail * 0.22) * 0.34;
 

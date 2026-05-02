@@ -559,3 +559,28 @@ test -s .tmp/m6-batch-out/batch-summary.json
 - In the local compare run, `gpu_fire_solar` rendered at about 63 effective FPS at 640x360 with
   `--crf 12` and `--ffmpeg-preset slow`.
 - Full validation passed.
+
+## 2026-05-02 - GPU Solar Flare Loop Pass
+
+### Changed
+
+- Reworked `solar_fire.glsl` prominence rendering from many small vertical plumes into fewer,
+  larger magnetic-loop-style solar flare arcs.
+- Converted loop rendering from sampled dots into continuous segment-distance glow.
+- Added slower fade/gating so flare loops appear and decay more naturally with the audio.
+- Added subtle plasma modulation around the loops to avoid a smooth neon-tube look.
+
+### Validation Run
+
+```bash
+.venv/bin/wavesmith preview .tmp/music/Low\ Under-Skin.mp3 .tmp/music/gpu-fire-solar-preview-v5-plasma.mp4 --backend gpu --preset gpu_fire_solar --seconds 10 --fps 30 --thumbnail-at best --crf 12 --ffmpeg-preset slow --watermark ""
+.venv/bin/ruff check .
+.venv/bin/python -m pytest
+```
+
+### Result
+
+- Solar preview rendered successfully with flare-loop visuals.
+- Local preview metric: about 71 effective FPS at 640x360 with `--crf 12` and
+  `--ffmpeg-preset slow`.
+- Full validation passed.

@@ -28,3 +28,18 @@ Compare result: 3 succeeded, 0 failed.
 - `gpu_shader_bloom`: about 58.8 effective FPS
 - `gpu_crystal_storm`: about 61.6 effective FPS
 - `gpu_fire_solar`: about 63.3 effective FPS
+
+## Flare Loop Pass
+
+The first version looked too much like a row of small comb-like plumes. The shader now uses fewer
+large magnetic-loop arcs:
+
+- loop arcs are drawn with segment-distance fields instead of sampled dots;
+- active loops fade in and out more slowly;
+- subtle plasma noise modulates the loops so they feel less like smooth neon tubes.
+
+Latest local preview:
+
+```bash
+.venv/bin/wavesmith preview .tmp/music/Low\ Under-Skin.mp3 .tmp/music/gpu-fire-solar-preview-v5-plasma.mp4 --backend gpu --preset gpu_fire_solar --seconds 10 --fps 30 --thumbnail-at best --crf 12 --ffmpeg-preset slow --watermark ""
+```
