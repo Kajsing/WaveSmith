@@ -13,11 +13,10 @@ from wavesmith.render.ffmpeg import (
     build_rawvideo_command,
     encode_raw_frames,
     extract_thumbnail,
-    parse_thumbnail_time,
     probe_duration_seconds,
 )
 from wavesmith.render.options import RenderOptions
-from wavesmith.render.thumbnail import write_poster_thumbnail
+from wavesmith.render.thumbnail import resolve_thumbnail_time, write_poster_thumbnail
 from wavesmith.timeline.model import Timeline
 from wavesmith.utils.logging import render_log_path, write_render_log
 
@@ -31,6 +30,7 @@ class RenderResult:
     cache_path: Path
     log_path: Path
     thumbnail_path: Path | None = None
+    thumbnail_time_seconds: float | None = None
 
 
 def render_video(options: RenderOptions) -> RenderResult:
@@ -38,6 +38,7 @@ def render_video(options: RenderOptions) -> RenderResult:
     preset = load_preset(options.preset)
     log_path = render_log_path(options.input_audio)
     duration_seconds: float | None = None
+    thumbnail_time: float | None = None
     cached: CachedAnalysis | None = None
     command: list[str] | None = None
     try:
@@ -76,8 +77,12 @@ def render_video(options: RenderOptions) -> RenderResult:
         )
         thumbnail_path = _thumbnail_path(options)
         if thumbnail_path:
+            thumbnail_time = resolve_thumbnail_time(
+                options.thumbnail_at,
+                duration_seconds,
+                cached.analysis,
+            )
             if options.thumbnail_style == "poster":
-                thumbnail_time = parse_thumbnail_time(options.thumbnail_at, duration_seconds)
                 write_poster_thumbnail(
                     output_image=thumbnail_path,
                     preset=preset,
@@ -88,7 +93,7 @@ def render_video(options: RenderOptions) -> RenderResult:
                 extract_thumbnail(
                     input_video=options.output_video,
                     output_image=thumbnail_path,
-                    at=options.thumbnail_at,
+                    at=f"{thumbnail_time:.3f}s",
                     duration_seconds=duration_seconds,
                 )
     except Exception as exc:
@@ -105,6 +110,7 @@ def render_video(options: RenderOptions) -> RenderResult:
             cache_path=cached.cache_path if cached else None,
             ffmpeg_command=command,
             thumbnail_path=_thumbnail_path(options),
+            thumbnail_time_seconds=thumbnail_time,
             error=exc,
         )
         raise
@@ -122,6 +128,7 @@ def render_video(options: RenderOptions) -> RenderResult:
         cache_path=cached.cache_path,
         ffmpeg_command=command,
         thumbnail_path=_thumbnail_path(options),
+        thumbnail_time_seconds=thumbnail_time,
     )
     return RenderResult(
         duration_seconds=duration_seconds,
@@ -129,6 +136,7 @@ def render_video(options: RenderOptions) -> RenderResult:
         cache_path=cached.cache_path,
         log_path=log_path,
         thumbnail_path=_thumbnail_path(options),
+        thumbnail_time_seconds=thumbnail_time,
     )
 
 

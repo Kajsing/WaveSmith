@@ -6,8 +6,12 @@ from typing import Any
 
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
+from wavesmith.audio.features import AudioAnalysis, TimeSeries
 from wavesmith.presets.schema import PresetConfig
+from wavesmith.render.ffmpeg import parse_thumbnail_time
 from wavesmith.visuals.base import blend_color, feature_float
+
+BEST_THUMBNAIL_TIMES = {"auto", "best", "peak"}
 
 
 def write_poster_thumbnail(
@@ -32,6 +36,104 @@ def write_poster_thumbnail(
     _draw_poster_ring(draw, width, height, preset, features, bass, treble)
     _draw_title(draw, width, height, preset, title)
     image.save(output_image, quality=92, optimize=True)
+
+
+def resolve_thumbnail_time(
+    value: str,
+    duration_seconds: float,
+    analysis: AudioAnalysis,
+) -> float:
+    """Resolve explicit or audio-reactive thumbnail timing."""
+    if value.strip().lower() in BEST_THUMBNAIL_TIMES:
+        return choose_reactive_thumbnail_time(analysis, duration_seconds)
+    return parse_thumbnail_time(value, duration_seconds)
+
+
+def choose_reactive_thumbnail_time(
+    analysis: AudioAnalysis,
+    duration_seconds: float,
+) -> float:
+    """Pick a musically strong thumbnail time from normalized analysis features."""
+    candidate_times = _candidate_times(analysis, duration_seconds)
+    if not candidate_times:
+        return round(duration_seconds * 0.5, 3)
+
+    if duration_seconds <= 4.0:
+        window_start = 0.0
+        window_end = duration_seconds
+    else:
+        margin = min(12.0, duration_seconds * 0.08)
+        window_start = margin
+        window_end = max(window_start, duration_seconds - margin)
+
+    midpoint = duration_seconds * 0.5
+    best_time = min(candidate_times, key=lambda time_seconds: abs(time_seconds - midpoint))
+    best_score = -1.0
+    for time_seconds in candidate_times:
+        if time_seconds < window_start or time_seconds > window_end:
+            continue
+        score = _thumbnail_score(analysis, time_seconds, duration_seconds)
+        if score > best_score:
+            best_score = score
+            best_time = time_seconds
+    return round(max(0.0, min(duration_seconds, best_time)), 3)
+
+
+def _candidate_times(analysis: AudioAnalysis, duration_seconds: float) -> list[float]:
+    for series in (
+        analysis.rms,
+        analysis.bass_energy,
+        analysis.mid_energy,
+        analysis.treble_energy,
+    ):
+        times = [time for time in series.times if 0.0 <= time <= duration_seconds]
+        if times:
+            return times
+    return []
+
+
+def _thumbnail_score(
+    analysis: AudioAnalysis,
+    time_seconds: float,
+    duration_seconds: float,
+) -> float:
+    rms = _series_value_at(analysis.rms, time_seconds)
+    bass = _series_value_at(analysis.bass_energy, time_seconds)
+    mid = _series_value_at(analysis.mid_energy, time_seconds)
+    treble = _series_value_at(analysis.treble_energy, time_seconds)
+    beat_bonus = _near_event_bonus(time_seconds, analysis.beats, 0.1, 0.1)
+    onset_bonus = _near_event_bonus(time_seconds, analysis.onsets, 0.08, 0.05)
+    center_position = time_seconds / max(0.001, duration_seconds)
+    center_bias = 1.0 - min(0.18, abs(center_position - 0.5) * 0.18)
+    score = rms * 0.34 + bass * 0.26 + mid * 0.14 + treble * 0.18
+    return (score + beat_bonus + onset_bonus) * center_bias
+
+
+def _series_value_at(series: TimeSeries, time_seconds: float) -> float:
+    if not series.times or not series.values:
+        return 0.0
+    index = min(
+        range(len(series.times)),
+        key=lambda candidate: abs(series.times[candidate] - time_seconds),
+    )
+    value = series.values[index]
+    if isinstance(value, list):
+        numeric_values = [float(item) for item in value if isinstance(item, int | float)]
+        if not numeric_values:
+            return 0.0
+        return max(0.0, min(1.0, sum(numeric_values) / len(numeric_values)))
+    return max(0.0, min(1.0, float(value)))
+
+
+def _near_event_bonus(
+    time_seconds: float,
+    events: list[float],
+    window_seconds: float,
+    amount: float,
+) -> float:
+    if any(abs(time_seconds - event) <= window_seconds for event in events):
+        return amount
+    return 0.0
 
 
 def _draw_gradient(

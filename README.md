@@ -106,8 +106,8 @@ wavesmith ai-prompt song.art.json --target poster --provider openai --out song.a
 wavesmith render song.mp3 preview.mp4 --preset neon_orb --thumbnail --thumbnail-at 50%
 ```
 
-`--thumbnail-at` accepts seconds, percentages, and named positions such as `intro`, `middle`,
-and `end`.
+`--thumbnail-at` accepts seconds, percentages, `best`, and named positions such as `intro`,
+`middle`, and `end`. `best` chooses a strong local moment from the audio analysis.
 
 Thumbnails are extracted locally from the rendered MP4 with ffmpeg by default. Use poster style for
 a designed local thumbnail based on preset colors and audio features:

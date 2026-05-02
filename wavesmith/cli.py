@@ -57,6 +57,8 @@ def _print_render_summary(output_video: Path, result: RenderResult) -> None:
     console.print(f"render_log={_compact_path(result.log_path, keep=26)}")
     if result.thumbnail_path:
         console.print(f"thumbnail={_compact_path(result.thumbnail_path, keep=26)}")
+    if result.thumbnail_time_seconds is not None:
+        console.print(f"thumbnail_time={result.thumbnail_time_seconds:.3f}s")
 
 
 def _run_render_command(
@@ -352,7 +354,7 @@ def render(
         str,
         typer.Option(
             "--thumbnail-at",
-            help="Thumbnail time: seconds, percent, or start/intro/middle/end.",
+            help="Thumbnail time: seconds, percent, best, or start/intro/middle/end.",
         ),
     ] = "50%",
     thumbnail_style: Annotated[
@@ -428,7 +430,7 @@ def preview(
         str,
         typer.Option(
             "--thumbnail-at",
-            help="Thumbnail time: seconds, percent, or start/intro/middle/end.",
+            help="Thumbnail time: seconds, percent, best, or start/intro/middle/end.",
         ),
     ] = "middle",
     thumbnail_style: Annotated[
@@ -536,7 +538,7 @@ def batch(
         str,
         typer.Option(
             "--thumbnail-at",
-            help="Thumbnail time: seconds, percent, or start/intro/middle/end.",
+            help="Thumbnail time: seconds, percent, best, or start/intro/middle/end.",
         ),
     ] = "50%",
     thumbnail_style: Annotated[

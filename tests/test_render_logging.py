@@ -32,10 +32,12 @@ def test_write_render_log_includes_cache_and_command(tmp_path) -> None:
         cache_status="hit",
         cache_path=Path(".cache/analysis/example.json"),
         ffmpeg_command=["ffmpeg", "-i", "pipe:0", "out.mp4"],
+        thumbnail_time_seconds=2.5,
     )
 
     text = log_path.read_text(encoding="utf-8")
 
     assert "status=success" in text
     assert "analysis_cache_status=hit" in text
+    assert "thumbnail_time_seconds=2.5" in text
     assert "ffmpeg_command=ffmpeg -i pipe:0 out.mp4" in text
