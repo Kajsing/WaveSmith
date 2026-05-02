@@ -104,34 +104,42 @@ void main() {
     float prominences = 0.0;
     float wisps = 0.0;
     float sparks = 0.0;
-    for (int i = 0; i < 7; i++) {
+    for (int i = 0; i < 9; i++) {
         float fi = float(i);
-        float t = fi / 6.0;
+        float t = fi / 8.0;
         float center_angle = mix(0.16, 0.84, t) * 3.14159265 + sin(fi * 5.17) * 0.075;
-        float spread = 0.07 + 0.04 * sin(fi * 2.4);
+        float spread = 0.09 + 0.045 * sin(fi * 2.4);
         float amount = spectrumAt(t * 0.86 + 0.07);
-        float life = 0.5 + 0.5 * sin(u_time * (0.16 + 0.035 * fi) + fi * 1.71);
-        float gate = smoothstep(0.36, 0.86, life + amount * 0.28 + u_bass * 0.12);
-        float active_level = gate * gate;
+        float life = 0.5 + 0.5 * sin(u_time * (0.15 + 0.03 * fi) + fi * 1.71);
+        float growth = smoothstep(0.18, 0.92, life);
+        float fade_out = mix(1.0, 0.34, smoothstep(0.66, 1.0, life));
+        float gate = smoothstep(0.33, 0.84, life + amount * 0.3 + u_bass * 0.14);
+        float active_level = gate * gate * fade_out;
         vec2 normal = vec2(cos(center_angle), sin(center_angle));
         vec2 tangent = vec2(-normal.y, normal.x);
         vec2 foot_a = sun_center + vec2(cos(center_angle - spread), sin(center_angle - spread)) * sun_radius;
         vec2 foot_b = sun_center + vec2(cos(center_angle + spread), sin(center_angle + spread)) * sun_radius;
-        float height = 0.17 + amount * 0.24 + u_slow_pulse * 0.09 + life * 0.1;
-        vec2 lift = normal * height + tangent * sin(u_time * 0.18 + fi) * height * 0.18;
-        float width = 0.023 + amount * 0.018 + u_line_strength * 0.015;
+        float height = 0.12 + amount * 0.18 + u_slow_pulse * 0.08 + growth * 0.2;
+        vec2 lift = normal * height + tangent * sin(u_time * 0.18 + fi) * height * 0.32;
+        float width = 0.02 + amount * 0.014 + u_line_strength * 0.012;
         float flare = loopArc(p, foot_a, foot_b, lift, width, u_time * 0.55 + fi * 2.3);
         prominences += flare * active_level;
 
-        float wisp = loopArc(
-            p,
-            foot_a + normal * 0.025,
-            foot_b + normal * 0.018,
-            lift * (1.18 + amount * 0.22),
-            width * 1.75,
-            u_time * 0.38 + fi * 1.4
-        );
-        wisps += wisp * active_level * (0.22 + amount * 0.28);
+        for (int j = 0; j < 4; j++) {
+            float fj = float(j);
+            float side = fj - 1.5;
+            float split = smoothstep(0.2, 0.86, growth + amount * 0.2);
+            float branch_phase = u_time * (0.34 + fj * 0.07) + fi * 1.4 + fj * 2.1;
+            vec2 branch_a = foot_a + tangent * side * width * (0.45 + split * 0.45) + normal * width * 0.35;
+            vec2 branch_b = foot_b + tangent * side * width * (0.65 + split * 0.85) + normal * width * 0.35;
+            vec2 branch_lift = lift * (1.04 + split * (0.08 + fj * 0.025));
+            branch_lift += tangent * side * width * (3.4 + split * 6.2);
+            float branch_width = width * (0.78 - fj * 0.09);
+            float branch = loopArc(p, branch_a, branch_b, branch_lift, branch_width, branch_phase);
+            float treble_flicker = 0.72 + u_treble * 0.55 + sin(branch_phase * 1.7) * 0.12;
+            float outer_fade = mix(1.0, 0.52, abs(side) / 1.5);
+            wisps += branch * active_level * split * treble_flicker * outer_fade * (0.14 + amount * 0.2);
+        }
 
         vec2 spark_pos = mix(foot_a, foot_b, 0.5) + lift * (0.9 + life * 0.18);
         sparks += exp(-length(p - spark_pos) * (22.0 + detail * 22.0)) * amount * active_level;

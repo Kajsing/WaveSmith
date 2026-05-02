@@ -584,3 +584,32 @@ test -s .tmp/m6-batch-out/batch-summary.json
 - Local preview metric: about 71 effective FPS at 640x360 with `--crf 12` and
   `--ffmpeg-preset slow`.
 - Full validation passed.
+
+## 2026-05-02 - GPU Solar Branching Filaments
+
+### Changed
+
+- Expanded the solar flare loops into branching filament bundles.
+- Each active flare now draws multiple offset strands around the main magnetic loop.
+- Flare lifecycle now separates growth and fade so loops can expand while losing brightness.
+- Wider footpoint spacing and transparent outer strands reduce the earlier comb/spike look.
+
+### Validation Run
+
+```bash
+.venv/bin/wavesmith preview .tmp/music/Low\ Under-Skin.mp3 .tmp/music/gpu-fire-solar-preview-v7-wide-filaments.mp4 --backend gpu --preset gpu_fire_solar --seconds 10 --fps 30 --thumbnail-at best --crf 12 --ffmpeg-preset slow --watermark ""
+.venv/bin/ruff check .
+.venv/bin/python -m pytest
+```
+
+### Result
+
+- Solar preview rendered successfully with branching filament loops.
+- Local preview metric: about 65 effective FPS at 640x360 with `--crf 12` and
+  `--ffmpeg-preset slow`.
+- Full validation passed.
+
+### Future Note
+
+- A later alternate GPU solar preset could use a whole sun centered in frame with surrounding
+  magnetic arcs instead of the current low-horizon solar surface perspective.

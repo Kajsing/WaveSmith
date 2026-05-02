@@ -43,3 +43,17 @@ Latest local preview:
 ```bash
 .venv/bin/wavesmith preview .tmp/music/Low\ Under-Skin.mp3 .tmp/music/gpu-fire-solar-preview-v5-plasma.mp4 --backend gpu --preset gpu_fire_solar --seconds 10 --fps 30 --thumbnail-at best --crf 12 --ffmpeg-preset slow --watermark ""
 ```
+
+## Branching Filament Pass
+
+The flare loops now branch into several offset strands per active loop. The lifecycle separates
+growth from fade, so flares can grow larger while their outer filaments lose brightness.
+
+Latest local preview:
+
+```bash
+.venv/bin/wavesmith preview .tmp/music/Low\ Under-Skin.mp3 .tmp/music/gpu-fire-solar-preview-v7-wide-filaments.mp4 --backend gpu --preset gpu_fire_solar --seconds 10 --fps 30 --thumbnail-at best --crf 12 --ffmpeg-preset slow --watermark ""
+```
+
+Future option: add a sibling preset that places the whole sun in the center of frame with magnetic
+arcs around the full circumference.
